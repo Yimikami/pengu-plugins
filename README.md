@@ -57,12 +57,6 @@ You can customize the plugin through the League Client settings panel:
    - Games to analyze: Set the number of recent games to include (1-200)
    - Queue Type: Select which queue type to show statistics for
 
-#### Installation
-
-1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
-2. Place `ProfileWinLose.js` in your Pengu Loader plugins folder
-3. Restart your League Client
-
 #### Usage
 
 1. Open any summoner profile in the League Client
