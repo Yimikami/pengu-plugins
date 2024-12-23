@@ -1,6 +1,6 @@
 # Pengu Loader Plugins
 
-A collection of Pengu Loader plugins to enhance your League of Legends experience. (Currently only ARAM Bot Enabler and Profile Win/Loss Display)
+A collection of Pengu Loader plugins to enhance your League of Legends experience.
 
 ## Plugins
 
