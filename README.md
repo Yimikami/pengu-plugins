@@ -12,7 +12,7 @@ A collection of Pengu Loader plugins to enhance your League of Legends experienc
 
 ## Plugins
 
-### ARAM Bot Enabler (v0.0.1)
+### [ARAM Bot Enabler](https://github.com/Yimikami/pengu-plugins/blob/main/AramBotEnabler.js) (v0.0.1)
 
 Enables the ability to add bots in ARAM custom games, a feature not normally available in the standard client.
 
@@ -29,7 +29,7 @@ Enables the ability to add bots in ARAM custom games, a feature not normally ava
 3. (Optional) Select a specific champion and difficulty from the dropdowns
 4. Click "Add Bot" to add the bot to your team
 
-### Profile Win/Loss Display Plugin (v0.0.1)
+### [Profile Win/Loss Display Plugin](https://github.com/Yimikami/pengu-plugins/blob/main/ProfileWinLose.js) (v0.0.1)
 
 A League of Legends plugin that shows summoner's win/loss statistics and win rate directly on their profile page.
 
