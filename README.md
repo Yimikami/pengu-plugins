@@ -7,12 +7,13 @@ A collection of Pengu Loader plugins to enhance your League of Legends experienc
 - [Plugins](#plugins)
   - [ARAM Bot Enabler](#aram-bot-enabler-v001)
   - [Profile Win/Loss Display Plugin](#profile-winloss-display-plugin-v001)
+  - [Mass Report Plugin](#mass-report-plugin-v001)
 - [Installation](#installation)
 - [Support](#support)
 
 ## Plugins
 
-### [ARAM Bot Enabler](https://github.com/Yimikami/pengu-plugins/blob/main/AramBotEnabler.js) (v0.0.1)
+### ARAM Bot Enabler (v0.0.1)
 
 Enables the ability to add bots in ARAM custom games, a feature not normally available in the standard client.
 
@@ -29,7 +30,7 @@ Enables the ability to add bots in ARAM custom games, a feature not normally ava
 3. (Optional) Select a specific champion and difficulty from the dropdowns
 4. Click "Add Bot" to add the bot to your team
 
-### [Profile Win/Loss Display Plugin](https://github.com/Yimikami/pengu-plugins/blob/main/ProfileWinLose.js) (v0.0.1)
+### Profile Win/Loss Display Plugin (v0.0.1)
 
 A League of Legends plugin that shows summoner's win/loss statistics and win rate directly on their profile page.
 
@@ -63,6 +64,41 @@ You can customize the plugin through the League Client settings panel:
 2. The win/loss statistics will appear automatically below the summoner name
 3. Use the settings panel to customize the display
 
+### Mass Report Plugin (v0.0.1)
+
+A plugin that allows mass reporting from match history with whitelist functionality to exclude specific players.
+
+#### Features
+
+- **Mass Reporting**: Report multiple players from a match using a single Game ID
+- **Whitelist System**: Maintain a list of players to exclude from reporting
+- **User-Friendly Interface**: Simple input field for Game ID and a clear "Report All" button
+- **Detailed Feedback**: Shows success/failure status for each report attempt
+
+#### Settings
+
+You can manage the plugin settings through the League Client settings panel:
+
+1. Open League Client settings
+2. Find the "Mass Report Settings" section
+3. Manage whitelisted players:
+   - Add players to whitelist: Enter summoner name and click "Add"
+   - Remove players: Click "Remove" next to any whitelisted player
+   - View all whitelisted players
+
+#### Usage
+
+1. Open any match in your match history
+2. Enter the Game ID in the input field
+3. Click "Report All" to process reports
+4. Monitor the toast notifications for report status
+
+#### Notes
+
+- The plugin automatically skips reporting yourself
+- Whitelisted players are automatically excluded from reports
+- Reports are processed with a delay to prevent rate limiting
+
 ## Installation
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
@@ -71,7 +107,8 @@ You can customize the plugin through the League Client settings panel:
    📂 Pengu Loader
    └── 📂 plugins
        ├── 📄 AramBotEnabler.js
-       └── 📄 ProfileWinLose.js
+       ├── 📄 ProfileWinLose.js
+       └── 📄 MassReport.js
    ```
 3. Restart your League client
 
