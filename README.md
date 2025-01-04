@@ -109,7 +109,8 @@ A plugin that adds a "LET THE FUN BEGIN 🤡" button to champion select, which r
 - **Random Champion Selection**: Intelligently selects a random champion from your available pool
 - **Random Runes**: Creates a random rune page for your champion
 - **Random Summoner Spells**: Selects random summoner spells
-- **Custom Item Sets**: Generates a random item build
+- **Random Item Sets**: Generates a random item build
+- **Random Skill Order**: Generates random skill order and applies it to the item set
 - **Smart Selection**: Uses weighted randomization to avoid repeating recent picks
 
 #### Usage:
