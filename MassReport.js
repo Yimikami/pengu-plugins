@@ -2,6 +2,7 @@
  * @name MassReport
  * @author Yimikami
  * @description Allows mass reporting from match history
+ * @link https://github.com/Yimikami/pengu-plugins/
  * @version 0.0.1
  */
 
