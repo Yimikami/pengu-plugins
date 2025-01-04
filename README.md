@@ -8,6 +8,7 @@ A collection of Pengu Loader plugins to enhance your League of Legends experienc
   - [ARAM Bot Enabler](#aram-bot-enabler-v001)
   - [Profile Win/Loss Display Plugin](#profile-winloss-display-plugin-v001)
   - [Mass Report Plugin](#mass-report-plugin-v001)
+  - [Randomize Plugin](#randomize-plugin-v001)
 - [Installation](#installation)
 - [Support](#support)
 
@@ -99,6 +100,29 @@ You can manage the plugin settings through the League Client settings panel:
 - Whitelisted players are automatically excluded from reports
 - Reports are processed with a delay to prevent rate limiting
 
+### Randomize Plugin (v0.0.1)
+
+A plugin that adds a "LET THE FUN BEGIN 🤡" button to champion select, which randomly selects a champion, runes, summoner spells, and creates a custom item set.
+
+#### Features:
+
+- **Random Champion Selection**: Intelligently selects a random champion from your available pool
+- **Random Runes**: Creates a random rune page for your champion
+- **Random Summoner Spells**: Selects random summoner spells
+- **Custom Item Sets**: Generates a random but coherent item build based on champion type
+- **Smart Selection**: Uses weighted randomization to avoid repeating recent picks
+- **Automatic Application**: All selections are automatically applied when entering champion select
+
+#### Usage:
+
+1. Enter champion select
+2. Look for the "LET THE FUN BEGIN 🤡" button in the bottom right
+3. Click the button to:
+   - Select a random champion
+   - Set up random runes
+   - Choose random summoner spells
+   - Create a custom item set
+
 ## Installation
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
@@ -108,7 +132,8 @@ You can manage the plugin settings through the League Client settings panel:
    └── 📂 plugins
        ├── 📄 AramBotEnabler.js
        ├── 📄 ProfileWinLose.js
-       └── 📄 MassReport.js
+       ├── 📄 MassReport.js
+       └── 📄 RandomizePlugin.js
    ```
 3. Restart your League client
 
