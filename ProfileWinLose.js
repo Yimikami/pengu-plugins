@@ -1,7 +1,8 @@
 /**
- * @name Profile Win/Loss Display
+ * @name ProfileWinLose
  * @author Yimikami
  * @description Shows summoner's win/loss statistics and win rate on their profile
+ * @link https://github.com/Yimikami/pengu-plugins/
  * @version 0.0.1
  */
 
