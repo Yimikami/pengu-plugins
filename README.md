@@ -6,9 +6,9 @@ A collection of Pengu Loader plugins to enhance your League of Legends experienc
 
 - [Plugins](#plugins)
   - [ARAM Bot Enabler](#aram-bot-enabler-v001)
-  - [Profile Win/Loss Display Plugin](#profile-winloss-display-plugin-v001)
-  - [Mass Report Plugin](#mass-report-plugin-v001)
-  - [Randomize Plugin](#randomize-plugin-v001)
+  - [Profile Win/Loss Display Plugin](#profile-winloss-display-plugin-v003)
+  - [Mass Report Plugin](#mass-report-plugin-v002)
+  - [Randomize Plugin](#randomize-plugin-v001) (OUTDATED)
 - [Installation](#installation)
 - [Support](#support)
 
@@ -31,7 +31,7 @@ Enables the ability to add bots in ARAM custom games, a feature not normally ava
 3. (Optional) Select a specific champion and difficulty from the dropdowns
 4. Click "Add Bot" to add the bot to your team
 
-### Profile Win/Loss Display Plugin (v0.0.1)
+### Profile Win/Loss Display Plugin (v0.0.3)
 
 A League of Legends plugin that shows summoner's win/loss statistics and win rate directly on their profile page.
 
@@ -41,7 +41,7 @@ A League of Legends plugin that shows summoner's win/loss statistics and win rat
 - **Queue Filtering**: Filter statistics by different queue types:
 
   - All Queues
-  - Normal (Quickplay)
+  - Normal (Swiftplay)
   - Ranked (Solo/Duo)
   - Ranked (Flex)
   - Normal (Draft Pick)
@@ -65,7 +65,7 @@ You can customize the plugin through the League Client settings panel:
 2. The win/loss statistics will appear automatically below the summoner name
 3. Use the settings panel to customize the display
 
-### Mass Report Plugin (v0.0.1)
+### Mass Report Plugin (v0.0.2)
 
 A plugin that allows mass reporting from match history with whitelist functionality to exclude specific players.
 
@@ -100,7 +100,7 @@ You can manage the plugin settings through the League Client settings panel:
 - Whitelisted players are automatically excluded from reports
 - Reports are processed with a delay to prevent rate limiting
 
-### Randomize Plugin (v0.0.1)
+### Randomize Plugin (OUTDATED)
 
 A plugin that adds a "LET THE FUN BEGIN 🤡" button to champion select, which randomly selects a champion, runes, summoner spells, and creates a custom item set.
 
