@@ -8,7 +8,7 @@ A collection of Pengu Loader plugins to enhance your League of Legends experienc
   - [ARAM Bot Enabler](#aram-bot-enabler-v001)
   - [Profile Win/Loss Display Plugin](#profile-winloss-display-plugin-v003)
   - [Mass Report Plugin](#mass-report-plugin-v002)
-  - [Randomize Plugin](#randomize-plugin-v001) (OUTDATED)
+  - [Randomize Plugin](#randomize-plugin-outdated) (OUTDATED)
 - [Installation](#installation)
 - [Support](#support)
 
