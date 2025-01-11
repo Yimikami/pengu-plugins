@@ -3,8 +3,29 @@
  * @author Yimikami
  * @description Shows summoner's win/loss statistics and win rate on their profile
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.2
+ * @version 0.0.3
  */
+
+import { settingsUtils } from "https://unpkg.com/blank-settings-utils@latest/Settings-Utils.js";
+
+let data = [
+  {
+    groupName: "profile-winloss",
+    titleKey: "el_profile_winloss",
+    titleName: "Profile Win/Loss",
+    capitalTitleKey: "el_profile_winloss_capital",
+    capitalTitleName: "PROFILE WIN/LOSS",
+    element: [
+      {
+        name: "profile-winloss-settings",
+        title: "el_profile_winloss_settings",
+        titleName: "PROFILE WIN/LOSS SETTINGS",
+        class: "profile-winloss-settings",
+        id: "profileWinlossSettings",
+      },
+    ],
+  },
+];
 
 (() => {
   // Default configuration
@@ -19,6 +40,7 @@
     retryDelay: 1000,
     cacheExpiry: 5 * 60 * 1000, // 5 minutes
     selectedQueue: "all", // Default queue type, filters matches from the last "gamesCount" games
+    kdaDisplay: "show", // KDA display option: "show", "hide"
   };
 
   // Configuration that will be loaded from DataStore
@@ -36,7 +58,6 @@
 
   // Cache implementation
   const cache = new Map();
-  let settingsObserver = null;
 
   // DataStore functions
   const SettingsStore = {
@@ -60,6 +81,7 @@
         const settings = {
           gamesCount: CONFIG.gamesCount,
           selectedQueue: CONFIG.selectedQueue,
+          kdaDisplay: CONFIG.kdaDisplay,
         };
         DataStore.set("profile-winloss-settings", JSON.stringify(settings));
         debugLog("Settings saved to DataStore:", settings);
@@ -143,141 +165,149 @@
     }
 
     initializeSettings() {
-      if (settingsObserver) {
-        settingsObserver.disconnect();
-      }
-
-      const addSettings = (scrollable) => {
-        if (!scrollable || document.getElementById("profile-winloss-settings"))
-          return;
-
-        const settingsRow = document.createElement("div");
-        settingsRow.className = "lol-settings-general-row";
-        settingsRow.id = "profile-winloss-settings";
-        settingsRow.innerHTML = `
-                    <div class="lol-settings-general-title">Profile Win/Loss Display</div>
-                    <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <p class="lol-settings-window-size-text">Games to analyze:</p>
-                            <lol-uikit-flat-input type="number" style="width: 80px;">
-                                <input type="number" min="1" max="200" value="${
-                                  CONFIG.gamesCount
-                                }" 
-                                       style="width: 100%; text-align: center;">
-                            </lol-uikit-flat-input>
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: thin solid #3c3c41;">
-                            <p class="lol-settings-window-size-text">Queue Type:</p>
-                            <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
-                                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                                  CONFIG.selectedQueue === "all"
-                                }" value="all">
-                                    All Queues
-                                    <div class="lol-tooltip-component"></div>
-                                </lol-uikit-dropdown-option>
-                                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                                  CONFIG.selectedQueue === "swiftplay"
-                                }" value="swiftplay">
-                                    Normal (swiftplay)
-                                    <div class="lol-tooltip-component"></div>
-                                </lol-uikit-dropdown-option>
-                                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                                  CONFIG.selectedQueue === "ranked_solo"
-                                }" value="ranked_solo">
-                                    Ranked (Solo/Duo)
-                                    <div class="lol-tooltip-component"></div>
-                                </lol-uikit-dropdown-option>
-                                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                                  CONFIG.selectedQueue === "ranked_flex"
-                                }" value="ranked_flex">
-                                    Ranked (Flex)
-                                    <div class="lol-tooltip-component"></div>
-                                </lol-uikit-dropdown-option>
-                                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                                  CONFIG.selectedQueue === "normal_draft"
-                                }" value="normal_draft">
-                                    Normal (Draft Pick)
-                                    <div class="lol-tooltip-component"></div>
-                                </lol-uikit-dropdown-option>
-                                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                                  CONFIG.selectedQueue === "aram"
-                                }" value="aram">
-                                    ARAM
-                                    <div class="lol-tooltip-component"></div>
-                                </lol-uikit-dropdown-option>
-                            </lol-uikit-framed-dropdown>
-                        </div>
-                    </div>
-                `;
-
-        const conductRow = scrollable.querySelector(
-          ".lol-settings-general-row"
+      const addSettings = () => {
+        const settingsContainer = document.querySelector(
+          ".profile-winloss-settings"
         );
-        if (conductRow) {
-          conductRow.parentNode.insertBefore(
-            settingsRow,
-            conductRow.nextSibling
-          );
-        } else {
-          scrollable.firstElementChild?.appendChild(settingsRow);
-        }
+        if (!settingsContainer) return;
+
+        settingsContainer.innerHTML = `
+          <div class="lol-settings-general-row">
+            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <p class="lol-settings-window-size-text">Games to analyze:</p>
+                <lol-uikit-flat-input type="number" style="width: 80px;">
+                  <input type="number" min="1" max="200" value="${
+                    CONFIG.gamesCount
+                  }" 
+                         style="width: 100%; text-align: center;">
+                </lol-uikit-flat-input>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <p class="lol-settings-window-size-text">Queue Type:</p>
+                <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
+                  ${Object.entries(QUEUE_TYPES)
+                    .map(
+                      ([key, value]) => `
+                    <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
+                      key === CONFIG.selectedQueue
+                    }" value="${key}">
+                      ${value.name}
+                      <div class="lol-tooltip-component"></div>
+                    </lol-uikit-dropdown-option>
+                  `
+                    )
+                    .join("")}
+                </lol-uikit-framed-dropdown>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: thin solid #3c3c41;">
+                <p class="lol-settings-window-size-text">KDA Display:</p>
+                <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
+                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
+                    CONFIG.kdaDisplay === "show"
+                  }" value="show">
+                    Show KDA
+                    <div class="lol-tooltip-component"></div>
+                  </lol-uikit-dropdown-option>
+                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
+                    CONFIG.kdaDisplay === "hide"
+                  }" value="hide">
+                    Hide KDA
+                    <div class="lol-tooltip-component"></div>
+                  </lol-uikit-dropdown-option>
+                </lol-uikit-framed-dropdown>
+              </div>
+            </div>
+          </div>
+        `;
 
         // Add event listeners
-        const input = settingsRow.querySelector("input");
+        const input = settingsContainer.querySelector("input");
         input.addEventListener("change", this.handleSettingsChange.bind(this));
 
-        const dropdown = settingsRow.querySelector("lol-uikit-framed-dropdown");
-        const dropdownOptions = dropdown.querySelectorAll(
+        // Queue Type dropdown
+        const queueDropdown = settingsContainer.querySelectorAll(
+          "lol-uikit-framed-dropdown"
+        )[0];
+        const queueOptions = queueDropdown.querySelectorAll(
           "lol-uikit-dropdown-option"
         );
 
-        // Set initial selected value
-        const currentOption = Array.from(dropdownOptions).find(
+        // Set initial queue selected value
+        const currentQueueOption = Array.from(queueOptions).find(
           (opt) => opt.getAttribute("value") === CONFIG.selectedQueue
         );
-        if (currentOption) {
-          dropdownOptions.forEach((opt) => opt.removeAttribute("selected"));
-          currentOption.setAttribute("selected", "");
-          dropdown.setAttribute("selected-value", CONFIG.selectedQueue);
-          dropdown.setAttribute(
+        if (currentQueueOption) {
+          queueOptions.forEach((opt) => opt.removeAttribute("selected"));
+          currentQueueOption.setAttribute("selected", "");
+          queueDropdown.setAttribute("selected-value", CONFIG.selectedQueue);
+          queueDropdown.setAttribute(
             "selected-item",
             QUEUE_TYPES[CONFIG.selectedQueue].name
           );
         }
 
-        dropdownOptions.forEach((option) => {
+        queueOptions.forEach((option) => {
           option.addEventListener("click", () => {
             const value = option.getAttribute("value");
             this.handleQueueChange(value);
 
             // Update selected state
-            dropdownOptions.forEach((opt) => opt.removeAttribute("selected"));
+            queueOptions.forEach((opt) => opt.removeAttribute("selected"));
             option.setAttribute("selected", "");
-            dropdown.setAttribute("selected-value", value);
-            dropdown.setAttribute("selected-item", QUEUE_TYPES[value].name);
+            queueDropdown.setAttribute("selected-value", value);
+            queueDropdown.setAttribute(
+              "selected-item",
+              QUEUE_TYPES[value].name
+            );
+          });
+        });
+
+        // KDA Display dropdown
+        const kdaDropdown = settingsContainer.querySelectorAll(
+          "lol-uikit-framed-dropdown"
+        )[1];
+        const kdaOptions = kdaDropdown.querySelectorAll(
+          "lol-uikit-dropdown-option"
+        );
+
+        kdaOptions.forEach((option) => {
+          option.addEventListener("click", () => {
+            const value = option.getAttribute("value");
+            CONFIG.kdaDisplay = value;
+            SettingsStore.saveSettings();
+
+            // Update selected state
+            kdaOptions.forEach((opt) => opt.removeAttribute("selected"));
+            option.setAttribute("selected", "");
+            kdaDropdown.setAttribute("selected-value", value);
+            kdaDropdown.setAttribute(
+              "selected-item",
+              value === "show" ? "Show KDA" : "Hide KDA"
+            );
+
+            if (this.currentSummonerId) {
+              this.updateStats(this.currentSummonerId);
+            }
           });
         });
       };
 
-      settingsObserver = new MutationObserver(() => {
-        const scrollable = document.querySelector(
-          "div.lol-settings-options lol-uikit-scrollable"
-        );
-        if (scrollable) addSettings(scrollable);
+      // Observe for settings container
+      const observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node.classList?.contains("profile-winloss-settings")) {
+              addSettings();
+              return;
+            }
+          }
+        }
       });
 
-      settingsObserver.observe(document.body, {
+      observer.observe(document.body, {
         childList: true,
         subtree: true,
-      });
-
-      document.addEventListener("click", (e) => {
-        if (e.target?.closest("lol-uikit-navigation-item")) {
-          const scrollable = document.querySelector(
-            "div.lol-settings-options lol-uikit-scrollable"
-          );
-          if (scrollable) addSettings(scrollable);
-        }
       });
     }
 
@@ -409,7 +439,7 @@
 
       const data = await utils.retry(fetchData);
       if (!data.games?.games) {
-        return { wins: 0, losses: 0, winRate: 0 };
+        return { wins: 0, losses: 0, winRate: 0, kda: 0 };
       }
 
       const filteredGames =
@@ -424,26 +454,46 @@
           const playerTeamId = game.participants[0].teamId;
           const teamWin =
             game.teams[playerTeamId === 100 ? 0 : 1].win === "Win";
+          const player = game.participants[0];
+
+          // Calculate KDA
+          const kills = player.stats.kills || 0;
+          const deaths = player.stats.deaths || 0;
+          const assists = player.stats.assists || 0;
+
           return {
             wins: acc.wins + (teamWin ? 1 : 0),
             losses: acc.losses + (teamWin ? 0 : 1),
+            totalKills: acc.totalKills + kills,
+            totalDeaths: acc.totalDeaths + deaths,
+            totalAssists: acc.totalAssists + assists,
           };
         },
-        { wins: 0, losses: 0 }
+        { wins: 0, losses: 0, totalKills: 0, totalDeaths: 0, totalAssists: 0 }
       );
 
       const totalGames = stats.wins + stats.losses;
+      const kda =
+        stats.totalDeaths === 0
+          ? (stats.totalKills + stats.totalAssists).toFixed(1)
+          : (
+              (stats.totalKills + stats.totalAssists) /
+              stats.totalDeaths
+            ).toFixed(1);
+
       const result = {
-        ...stats,
+        wins: stats.wins,
+        losses: stats.losses,
         winRate:
           totalGames === 0 ? 0 : ((stats.wins / totalGames) * 100).toFixed(1),
+        kda: kda,
       };
 
       cache.set(cacheKey, { data: result, timestamp: Date.now() });
       return result;
     }
 
-    displayStats({ wins, losses, winRate }) {
+    displayStats({ wins, losses, winRate, kda }) {
       if (!this.statsContainer) {
         this.createStatsContainer();
       }
@@ -451,15 +501,18 @@
       const content = document.createElement("div");
       content.className = "profile-win-loss-stats";
       content.innerHTML = `
-                <div class="queue-type">${
-                  QUEUE_TYPES[CONFIG.selectedQueue].name
-                }</div>
-                <div class="stats-row">
-                    <span class="wins">${wins}W</span>
-                    <span class="losses">${losses}L</span>
-                    <span class="winrate">${winRate}%</span>
-                </div>
-            `;
+        <div class="queue-type">${QUEUE_TYPES[CONFIG.selectedQueue].name}</div>
+        <div class="stats-row">
+          <span class="wins">${wins}W</span>
+          <span class="losses">${losses}L</span>
+          <span class="winrate">${winRate}%</span>
+          ${
+            CONFIG.kdaDisplay === "show"
+              ? `<span class="kda">${kda}|KDA</span>`
+              : ""
+          }
+        </div>
+      `;
 
       this.statsContainer.replaceChildren(content);
     }
@@ -595,6 +648,10 @@
                     color: #f0e6d2;
                     text-shadow: 0 0 3px rgba(240, 230, 210, 0.3);
                 }
+                .profile-win-loss-stats .kda {
+                    color: #c8aa6e;
+                    text-shadow: 0 0 3px rgba(200, 170, 110, 0.3);
+                }
                 .profile-win-loss-stats .loading {
                     color: #c8aa6e;
                     text-shadow: 0 0 3px rgba(200, 170, 110, 0.3);
@@ -625,5 +682,8 @@
   }
 
   // Initialize when window loads
-  window.addEventListener("load", () => new ProfileWinLoseStats());
+  window.addEventListener("load", () => {
+    settingsUtils(window, data);
+    new ProfileWinLoseStats();
+  });
 })();
