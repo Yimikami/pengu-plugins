@@ -34,13 +34,15 @@ let data = [
     api: {
       matchHistory: "/lol-match-history/v1/products/lol/",
     },
-    debug: false,
+    debug: true,
     gamesCount: 40, // Number of games to fetch (max 200). Changeable in settings.
     retryAttempts: 3,
     retryDelay: 1000,
     cacheExpiry: 5 * 60 * 1000, // 5 minutes
     selectedQueue: "all", // Default queue type, filters matches from the last "gamesCount" games
     kdaDisplay: "show", // KDA display option: "show", "hide"
+    seasonStartDate: new Date("2025-01-09T00:00:00Z").getTime(), // Season 15 start date
+    seasonFilter: "on", // Season filter option: "on", "off"
   };
 
   // Configuration that will be loaded from DataStore
@@ -82,6 +84,7 @@ let data = [
           gamesCount: CONFIG.gamesCount,
           selectedQueue: CONFIG.selectedQueue,
           kdaDisplay: CONFIG.kdaDisplay,
+          seasonFilter: CONFIG.seasonFilter,
         };
         DataStore.set("profile-winloss-settings", JSON.stringify(settings));
         debugLog("Settings saved to DataStore:", settings);
@@ -200,6 +203,23 @@ let data = [
                     .join("")}
                 </lol-uikit-framed-dropdown>
               </div>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <p class="lol-settings-window-size-text">Season 15 Filter:</p>
+                <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
+                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
+                    CONFIG.seasonFilter === "on"
+                  }" value="on">
+                    On
+                    <div class="lol-tooltip-component"></div>
+                  </lol-uikit-dropdown-option>
+                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
+                    CONFIG.seasonFilter === "off"
+                  }" value="off">
+                    Off
+                    <div class="lol-tooltip-component"></div>
+                  </lol-uikit-dropdown-option>
+                </lol-uikit-framed-dropdown>
+              </div>
               <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: thin solid #3c3c41;">
                 <p class="lol-settings-window-size-text">KDA Display:</p>
                 <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
@@ -263,10 +283,34 @@ let data = [
           });
         });
 
+        // Season Filter dropdown
+        const seasonDropdown = settingsContainer.querySelectorAll(
+          "lol-uikit-framed-dropdown"
+        )[1];
+        const seasonOptions = seasonDropdown.querySelectorAll(
+          "lol-uikit-dropdown-option"
+        );
+
+        seasonOptions.forEach((option) => {
+          option.addEventListener("click", () => {
+            const value = option.getAttribute("value");
+            this.handleSeasonChange(value);
+
+            // Update selected state
+            seasonOptions.forEach((opt) => opt.removeAttribute("selected"));
+            option.setAttribute("selected", "");
+            seasonDropdown.setAttribute("selected-value", value);
+            seasonDropdown.setAttribute(
+              "selected-item",
+              value === "on" ? "On" : "Off"
+            );
+          });
+        });
+
         // KDA Display dropdown
         const kdaDropdown = settingsContainer.querySelectorAll(
           "lol-uikit-framed-dropdown"
-        )[1];
+        )[2];
         const kdaOptions = kdaDropdown.querySelectorAll(
           "lol-uikit-dropdown-option"
         );
@@ -350,6 +394,21 @@ let data = [
       }
     }
 
+    handleSeasonChange(newSeason) {
+      debugLog("Season 15 filter change triggered:", newSeason);
+      CONFIG.seasonFilter = newSeason;
+      cache.clear();
+      debugLog(`Season 15 filter updated to: ${newSeason}`);
+      Toast.success(
+        `Season 15 filter updated to: ${newSeason === "on" ? "On" : "Off"}`
+      );
+      SettingsStore.saveSettings();
+
+      if (this.currentSummonerId) {
+        this.updateStats(this.currentSummonerId);
+      }
+    }
+
     setupCleanup() {
       window.addEventListener("unload", () => {
         this.isCleanedUp = true;
@@ -417,7 +476,7 @@ let data = [
     }
 
     async fetchStats(puuid) {
-      const cacheKey = `stats_${puuid}_${CONFIG.selectedQueue}`;
+      const cacheKey = `stats_${puuid}_${CONFIG.selectedQueue}_${CONFIG.seasonFilter}`;
       const cachedData = cache.get(cacheKey);
 
       if (
@@ -442,14 +501,26 @@ let data = [
         return { wins: 0, losses: 0, winRate: 0, kda: 0 };
       }
 
-      const filteredGames =
+      // Filter games by season if needed
+      let filteredGames = data.games.games;
+      if (CONFIG.seasonFilter === "on") {
+        filteredGames = filteredGames.filter(
+          (game) => game.gameCreation >= CONFIG.seasonStartDate
+        );
+      }
+
+      // Filter by queue type
+      filteredGames =
         CONFIG.selectedQueue === "all"
-          ? data.games.games
-          : data.games.games.filter(
+          ? filteredGames
+          : filteredGames.filter(
               (game) => game.queueId === QUEUE_TYPES[CONFIG.selectedQueue].id
             );
 
-      const stats = filteredGames.reduce(
+      // Limit to the user-specified number of games after filtering
+      const limitedGames = filteredGames.slice(0, CONFIG.gamesCount);
+
+      const stats = limitedGames.reduce(
         (acc, game) => {
           const playerTeamId = game.participants[0].teamId;
           const teamWin =
