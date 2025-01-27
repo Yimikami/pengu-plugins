@@ -9,6 +9,7 @@ A collection of Pengu Loader plugins to enhance your League of Legends experienc
   - [Profile Win/Loss Display Plugin](#profile-winloss-display-plugin-v003)
   - [Mass Report Plugin](#mass-report-plugin-v002)
   - [Randomize Plugin](#randomize-plugin-outdated) (OUTDATED)
+  - [Instant Ranked Lobby](#instant-ranked-lobby-v001)
 - [Installation](#installation)
 - [Support](#support)
 
@@ -123,6 +124,10 @@ A plugin that adds a "LET THE FUN BEGIN 🤡" button to champion select, which r
    - Choose random summoner spells
    - Create a custom item set
 
+### Instant Ranked Lobby (v0.0.1)
+
+A plugin that instantly creates solo/duo ranked lobby when pressing play button.
+
 ## Installation
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
@@ -133,6 +138,7 @@ A plugin that adds a "LET THE FUN BEGIN 🤡" button to champion select, which r
        ├── 📄 AramBotEnabler.js
        ├── 📄 ProfileWinLose.js
        ├── 📄 MassReport.js
+       ├── 📄 InstantRankedLobby.js
        └── 📄 RandomizePlugin.js
    ```
 3. Restart your League client
