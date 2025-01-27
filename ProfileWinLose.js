@@ -34,7 +34,7 @@ let data = [
     api: {
       matchHistory: "/lol-match-history/v1/products/lol/",
     },
-    debug: true,
+    debug: false,
     gamesCount: 40, // Number of games to fetch (max 200). Changeable in settings.
     retryAttempts: 3,
     retryDelay: 1000,
@@ -67,9 +67,16 @@ let data = [
       try {
         const settings = DataStore.get("profile-winloss-settings");
         if (settings) {
+          const userSettings = JSON.parse(settings);
+          // Only override user-configurable settings
           CONFIG = {
             ...DEFAULT_CONFIG,
-            ...JSON.parse(settings),
+            gamesCount: userSettings.gamesCount ?? DEFAULT_CONFIG.gamesCount,
+            selectedQueue:
+              userSettings.selectedQueue ?? DEFAULT_CONFIG.selectedQueue,
+            kdaDisplay: userSettings.kdaDisplay ?? DEFAULT_CONFIG.kdaDisplay,
+            seasonFilter:
+              userSettings.seasonFilter ?? DEFAULT_CONFIG.seasonFilter,
           };
           debugLog("Settings loaded from DataStore:", CONFIG);
         }
@@ -80,6 +87,7 @@ let data = [
 
     async saveSettings() {
       try {
+        // Only save user-configurable settings
         const settings = {
           gamesCount: CONFIG.gamesCount,
           selectedQueue: CONFIG.selectedQueue,
