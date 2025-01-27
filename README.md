@@ -7,7 +7,7 @@ A collection of Pengu Loader plugins to enhance your League of Legends experienc
 - [Plugins](#plugins)
   - [ARAM Bot Enabler](#aram-bot-enabler-v001)
   - [Profile Win/Loss Display Plugin](#profile-winloss-display-plugin-v003)
-  - [Mass Report Plugin](#mass-report-plugin-v002)
+  - [Mass Report Plugin](#mass-report-plugin-v003)
   - [Randomize Plugin](#randomize-plugin-outdated) (OUTDATED)
   - [Instant Ranked Lobby](#instant-ranked-lobby-v001)
 - [Installation](#installation)
@@ -66,13 +66,14 @@ You can customize the plugin through the League Client settings panel:
 2. The win/loss statistics will appear automatically below the summoner name
 3. Use the settings panel to customize the display
 
-### Mass Report Plugin (v0.0.2)
+### Mass Report Plugin (v0.0.3)
 
 A plugin that allows mass reporting from match history with whitelist functionality to exclude specific players.
 
 #### Features
 
 - **Mass Reporting**: Report multiple players from a match using a single Game ID
+- **Selective Reporting**: Report only your team or the enemy team
 - **Whitelist System**: Maintain a list of players to exclude from reporting
 - **User-Friendly Interface**: Simple input field for Game ID and a clear "Report All" button
 - **Detailed Feedback**: Shows success/failure status for each report attempt

@@ -3,7 +3,7 @@
  * @author Yimikami
  * @description Allows mass reporting from match history
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.2
+ * @version 0.0.3
  */
 
 import { settingsUtils } from "https://unpkg.com/blank-settings-utils@latest/Settings-Utils.js";
@@ -54,17 +54,19 @@ let data = [
           const parsedSettings = JSON.parse(settings);
           CONFIG = {
             ...DEFAULT_CONFIG,
-            ...parsedSettings,
             whitelistedPlayers: new Set(
               parsedSettings.whitelistedPlayers || []
             ),
           };
-          utils.debugLog("Settings loaded from DataStore:", CONFIG);
+          utils.debugLog(
+            "Whitelisted players loaded from DataStore:",
+            Array.from(CONFIG.whitelistedPlayers)
+          );
         } else {
           CONFIG.whitelistedPlayers = new Set();
         }
       } catch (error) {
-        console.error("[MassReport] Error loading settings:", error);
+        console.error("[MassReport] Error loading whitelisted players:", error);
         CONFIG.whitelistedPlayers = new Set();
       }
     },
@@ -72,13 +74,15 @@ let data = [
     async saveSettings() {
       try {
         const settings = {
-          ...CONFIG,
           whitelistedPlayers: Array.from(CONFIG.whitelistedPlayers),
         };
         DataStore.set("mass-report-settings", JSON.stringify(settings));
-        utils.debugLog("Settings saved to DataStore:", settings);
+        utils.debugLog(
+          "Whitelisted players saved to DataStore:",
+          settings.whitelistedPlayers
+        );
       } catch (error) {
-        console.error("[MassReport] Error saving settings:", error);
+        console.error("[MassReport] Error saving whitelisted players:", error);
       }
     },
   };
@@ -333,6 +337,7 @@ let data = [
             #mass-report-container {
                 display: flex;
                 gap: 10px;
+                align-items: center;
             }
             .mass-report-input {
                 background: #1e2328;
@@ -346,13 +351,25 @@ let data = [
                 outline: none;
                 border-color: #c8aa6e;
             }
+            #report-target-select {
+                height: 32px;
+                min-width: 150px;
+            }
             #mass-report-btn {
                 padding: 5px 15px;
                 color: #cdbe91;
                 cursor: pointer;
+                min-width: 100px;
+                text-align: center;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
             }
             #mass-report-btn:hover {
                 color: #f0e6d2;
+            }
+            #mass-report-btn:active {
+                filter: brightness(0.8);
             }
             #mass-report-settings {
                 font-family: "LoL Display";
@@ -391,6 +408,58 @@ let data = [
       this.styleElement = styleElement;
     }
 
+    createDropdownOption(value, text) {
+      const option = document.createElement("lol-uikit-dropdown-option");
+      option.setAttribute("slot", "lol-uikit-dropdown-option");
+      option.setAttribute("value", value);
+      if (value === "all") {
+        option.setAttribute("selected", "");
+      }
+      option.textContent = text;
+      return option;
+    }
+
+    createDropdown() {
+      const dropdown = document.createElement("lol-uikit-framed-dropdown");
+      dropdown.style = "height: 32px;";
+      dropdown.setAttribute("direction", "downward");
+      dropdown.setAttribute("tabindex", "0");
+      return dropdown;
+    }
+
+    createTargetSelect() {
+      const dropdown = this.createDropdown();
+      dropdown.id = "report-target-select";
+
+      const options = [
+        { value: "all", text: "Report All Players" },
+        { value: "enemy", text: "Report Enemy Team" },
+        { value: "ally", text: "Report My Team" },
+      ];
+
+      const fragment = document.createDocumentFragment();
+      options.forEach((option) => {
+        fragment.appendChild(
+          this.createDropdownOption(option.value, option.text)
+        );
+      });
+
+      dropdown.appendChild(fragment);
+
+      // Add change event listener
+      dropdown.addEventListener("change", () => {
+        const selectedOption = dropdown.querySelector(
+          "lol-uikit-dropdown-option[selected]"
+        );
+        utils.debugLog(
+          "Dropdown value changed to:",
+          selectedOption ? selectedOption.getAttribute("value") : "all"
+        );
+      });
+
+      return dropdown;
+    }
+
     observeMatchHistory() {
       const observer = new MutationObserver(() => {
         const matchDetailsRoot = document.querySelector(".match-details-root");
@@ -421,6 +490,7 @@ let data = [
       container.style.alignItems = "center";
       container.style.marginLeft = "auto";
       container.style.marginRight = "20px";
+      container.style.gap = "10px";
 
       const input = document.createElement("input");
       input.type = "text";
@@ -428,19 +498,31 @@ let data = [
       input.placeholder = "Enter Game ID";
       input.className = "mass-report-input";
 
-      const button = document.createElement("lol-uikit-flat-button");
-      button.id = "mass-report-btn";
-      button.textContent = "Report All";
-      button.onclick = () => this.handleReport();
+      const targetSelect = this.createTargetSelect();
+
+      const reportButton = document.createElement("lol-uikit-flat-button");
+      reportButton.id = "mass-report-btn";
+      reportButton.textContent = "Report";
+      reportButton.onclick = () => {
+        const selectedOption = targetSelect.querySelector(
+          "lol-uikit-dropdown-option[selected]"
+        );
+        const teamType = selectedOption
+          ? selectedOption.getAttribute("value")
+          : "all";
+        utils.debugLog("Selected team type:", teamType);
+        this.handleReport(teamType);
+      };
 
       container.appendChild(input);
-      container.appendChild(button);
+      container.appendChild(targetSelect);
+      container.appendChild(reportButton);
 
       navBar.appendChild(container);
       utils.debugLog("UI elements injected");
     }
 
-    async handleReport() {
+    async handleReport(teamType = "all") {
       const gameId = document.querySelector("#game-id-input").value;
       if (!gameId) {
         utils.debugLog("No game ID entered");
@@ -448,7 +530,9 @@ let data = [
         return;
       }
 
-      utils.debugLog(`Starting report process for game: ${gameId}`);
+      utils.debugLog(
+        `Starting report process for game: ${gameId}, team: ${teamType}`
+      );
 
       try {
         // Get current summoner info
@@ -465,21 +549,73 @@ let data = [
           `${CONFIG.api.matchHistory}/${gameId}`
         );
         const gameData = await gameResponse.json();
-        utils.debugLog("Game data received");
+        utils.debugLog("Game data:", gameData);
+
+        if (!gameData.participants || !gameData.participantIdentities) {
+          utils.debugLog("Invalid game data received");
+          utils.showToast("error", "Invalid game data received");
+          return;
+        }
 
         const players = gameData.participantIdentities;
         utils.debugLog(`Found ${players.length} players in game`);
+
+        // Find current player's participant ID first
+        const currentPlayerIdentity = players.find(
+          (pi) => pi.player.summonerId === currentSummoner.summonerId
+        );
+
+        if (!currentPlayerIdentity) {
+          utils.debugLog("Could not find current player in game");
+          utils.showToast("error", "Could not find you in this game");
+          return;
+        }
+
+        // Then find current player's team using participant ID
+        const currentPlayerParticipant = gameData.participants.find(
+          (p) => p.participantId === currentPlayerIdentity.participantId
+        );
+
+        if (!currentPlayerParticipant) {
+          utils.debugLog("Could not find current player's team data");
+          utils.showToast("error", "Could not determine your team");
+          return;
+        }
+
+        const currentPlayerTeam = currentPlayerParticipant.teamId;
+        utils.debugLog(`Current player's team: ${currentPlayerTeam}`);
 
         let reportCount = 0;
         let failCount = 0;
         let skippedCount = 0;
 
+        // Create a map of participantId to participant data for faster lookups
+        const participantMap = new Map(
+          gameData.participants.map((p) => [p.participantId, p])
+        );
+
         for (const player of players) {
-          const playerName = player.player.gameName;
+          const playerName =
+            player.player.gameName || player.player.summonerName;
+          const playerParticipant = participantMap.get(player.participantId);
+
+          if (!playerParticipant) {
+            utils.debugLog(`Could not find team data for player ${playerName}`);
+            skippedCount++;
+            continue;
+          }
+
+          const isAlly = playerParticipant.teamId === currentPlayerTeam;
+          utils.debugLog(`Player ${playerName} team info:`, {
+            playerTeam: playerParticipant.teamId,
+            currentTeam: currentPlayerTeam,
+            isAlly: isAlly,
+          });
 
           // Skip if this is the current player
           if (player.player.summonerId === currentSummoner.summonerId) {
             utils.debugLog(`Skipping self (${playerName})`);
+            skippedCount++;
             continue;
           }
 
@@ -490,10 +626,27 @@ let data = [
             continue;
           }
 
-          utils.debugLog(`Processing player:`, {
-            summonerId: player.player.summonerId,
-            puuid: player.player.puuid,
+          // Skip based on team selection
+          if (teamType === "enemy" && isAlly) {
+            utils.debugLog(
+              `Skipping ally player (${playerName}) in enemy team mode`
+            );
+            skippedCount++;
+            continue;
+          }
+          if (teamType === "ally" && !isAlly) {
+            utils.debugLog(
+              `Skipping enemy player (${playerName}) in ally team mode`
+            );
+            skippedCount++;
+            continue;
+          }
+
+          utils.debugLog(`Processing player for report:`, {
             name: playerName,
+            team: playerParticipant.teamId,
+            isAlly,
+            teamType,
           });
 
           const success = await sendReport(
