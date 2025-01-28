@@ -1,138 +1,111 @@
-# Pengu Loader Plugins
+# Pengu Loader Plugins 🐧
 
-A collection of Pengu Loader plugins to enhance your League of Legends experience.
+[![Pengu Loader](https://img.shields.io/badge/Pengu%20Loader-Compatible-blue)](https://github.com/PenguLoader/PenguLoader)
+[![League of Legends](https://img.shields.io/badge/League%20of%20Legends-Plugins-red)](https://www.leagueoflegends.com/)
 
-## Menu
+> A curated collection of powerful plugins to enhance your League of Legends experience! 🎮✨
 
-- [Plugins](#plugins)
-  - [ARAM Bot Enabler](#aram-bot-enabler-v001)
-  - [Profile Win/Loss Display Plugin](#profile-winloss-display-plugin-v003)
-  - [Mass Report Plugin](#mass-report-plugin-v003)
-  - [Randomize Plugin](#randomize-plugin-outdated) (OUTDATED)
-  - [Instant Ranked Lobby](#instant-ranked-lobby-v001)
-- [Installation](#installation)
-- [Support](#support)
+## 📚 Table of Contents
 
-## Plugins
+- [🔌 Available Plugins](#-available-plugins)
+- [⚡ Quick Installation](#-quick-installation)
+- [🆘 Support](#-support)
 
-### ARAM Bot Enabler (v0.0.1)
+## 🔌 Available Plugins
 
-Enables the ability to add bots in ARAM custom games, a feature not normally available in the standard client.
+### 🤖 ARAM Bot Enabler (v0.0.1)
 
-#### Features:
+> Add bots to your ARAM custom games!
 
-- Add bots to either team in ARAM custom games
-- Select specific champions for bots or choose random
-- Choose bot difficulty (Intro, Beginner, Intermediate)
+**Key Features:**
 
-#### Usage:
+- ✅ Add bots to either team in ARAM custom games
+- ✅ Select specific champions for bots or choose random
+- ✅ Choose bot difficulty (Intro, Beginner, Intermediate)
+
+<details>
+<summary>📖 Usage Guide</summary>
 
 1. Create an ARAM custom game
 2. Look for the "Add Bot" buttons that are now enabled
 3. (Optional) Select a specific champion and difficulty from the dropdowns
 4. Click "Add Bot" to add the bot to your team
+</details>
 
-### Profile Win/Loss Display Plugin (v0.0.3)
+### 📊 Profile Win/Loss Display (v0.0.3)
 
-A League of Legends plugin that shows summoner's win/loss statistics and win rate directly on their profile page.
+> Get detailed statistics right on the profile page!
 
-#### Features
+**Key Features:**
 
-- **Win/Loss Statistics**: Displays wins, losses, and win rate percentage
-- **Queue Filtering**: Filter statistics by different queue types:
+- 📈 Comprehensive win/loss statistics
+- 🔍 Filter by queue type (All, Normal, Ranked, ARAM)
+- 🗓️ Season 15 specific statistics
+- ⚙️ Customizable game count (1-200)
 
-  - All Queues
-  - Normal (Swiftplay)
-  - Ranked (Solo/Duo)
-  - Ranked (Flex)
-  - Normal (Draft Pick)
-  - ARAM
+<details>
+<summary>📖 Usage Guide</summary>
 
-- **Customizable Game Count**: Choose how many recent games to analyze (1-200)
+1. Open any summoner profile
+2. View statistics automatically below summoner name
+3. Customize via settings:
+   - Games to analyze (1-200)
+   - Queue Type filter
+   - Season 15 filter
+   </details>
 
-#### Settings
+### ⚖️ Mass Report Plugin (v0.0.3)
 
-You can customize the plugin through the League Client settings panel:
+> Efficient reporting system with whitelist protection
 
-1. Open League Client settings
-2. Find the "Profile Win/Loss Display" section
-3. Adjust these settings:
-   - Games to analyze: Set the number of recent games to include (1-200)
-   - Queue Type: Select which queue type to show statistics for
+**Key Features:**
 
-#### Usage
+- 🎯 Mass reporting from match history
+- 👥 Team-specific reporting options
+- ⭐ Whitelist system for player protection
+- 📝 Detailed feedback on report status
 
-1. Open any summoner profile in the League Client
-2. The win/loss statistics will appear automatically below the summoner name
-3. Use the settings panel to customize the display
+<details>
+<summary>📖 Usage Guide</summary>
 
-### Mass Report Plugin (v0.0.3)
+1. Open any match in history
+2. Enter the Game ID
+3. Click "Report All"
+4. Monitor toast notifications
+</details>
 
-A plugin that allows mass reporting from match history with whitelist functionality to exclude specific players.
+### 🎲 Randomize Plugin (OUTDATED)
 
-#### Features
+> Add excitement to your games with random selections!
 
-- **Mass Reporting**: Report multiple players from a match using a single Game ID
-- **Selective Reporting**: Report only your team or the enemy team
-- **Whitelist System**: Maintain a list of players to exclude from reporting
-- **User-Friendly Interface**: Simple input field for Game ID and a clear "Report All" button
-- **Detailed Feedback**: Shows success/failure status for each report attempt
+**Key Features:**
 
-#### Settings
+- 🎭 Random champion selection
+- 🎯 Random runes configuration
+- ⚔️ Random summoner spells
+- 🛠️ Random item builds
+- 📚 Random skill order
 
-You can manage the plugin settings through the League Client settings panel:
-
-1. Open League Client settings
-2. Find the "Mass Report Settings" section
-3. Manage whitelisted players:
-   - Add players to whitelist: Enter summoner name and click "Add"
-   - Remove players: Click "Remove" next to any whitelisted player
-   - View all whitelisted players
-
-#### Usage
-
-1. Open any match in your match history
-2. Enter the Game ID in the input field
-3. Click "Report All" to process reports
-4. Monitor the toast notifications for report status
-
-#### Notes
-
-- The plugin automatically skips reporting yourself
-- Whitelisted players are automatically excluded from reports
-- Reports are processed with a delay to prevent rate limiting
-
-### Randomize Plugin (OUTDATED)
-
-A plugin that adds a "LET THE FUN BEGIN 🤡" button to champion select, which randomly selects a champion, runes, summoner spells, and creates a custom item set.
-
-#### Features:
-
-- **Random Champion Selection**: Intelligently selects a random champion from your available pool
-- **Random Runes**: Creates a random rune page for your champion
-- **Random Summoner Spells**: Selects random summoner spells
-- **Random Item Sets**: Generates a random item build
-- **Random Skill Order**: Generates random skill order and applies it to the item set
-- **Smart Selection**: Uses weighted randomization to avoid repeating recent picks
-
-#### Usage:
+<details>
+<summary>📖 Usage Guide</summary>
 
 1. Enter champion select
-2. Look for the "LET THE FUN BEGIN 🤡" button in the bottom right
-3. Click the button to:
-   - Select a random champion
-   - Set up random runes
-   - Choose random summoner spells
-   - Create a custom item set
+2. Find the "LET THE FUN BEGIN 🤡" button
+3. Click and enjoy the randomness!
+</details>
 
-### Instant Ranked Lobby (v0.0.1)
+### ⚡ Instant Ranked Lobby (v0.0.1)
 
-A plugin that instantly creates solo/duo ranked lobby when pressing play button.
+> Quick access to ranked games!
 
-## Installation
+**Feature:**
+
+- 🚀 Instantly creates solo/duo ranked lobby when pressing play button
+
+## ⚡ Quick Installation
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
-2. Place the plugin files in your Pengu Loader plugins folder:
+2. Copy plugins to your Pengu Loader directory:
    ```
    📂 Pengu Loader
    └── 📂 plugins
@@ -144,13 +117,48 @@ A plugin that instantly creates solo/duo ranked lobby when pressing play button.
    ```
 3. Restart your League client
 
-## Support
+## 🆘 Support
 
-If you encounter any issues try the following:
+**Having issues?**
 
-1. Check if your Pengu Loader is up to date
-2. Try restarting the League client
+1. ✅ Verify your Pengu Loader is up to date
+2. 🔄 Try restarting the League client
+3. 🐛 Report issues:
+   - Create a [GitHub Issue](https://github.com/Yimikami/pengu-plugins/issues) (preferred)
+   - Email: [hi@yimikami.me](mailto:hi@yimikami.me)
 
-Also you can always contact me at [hi@yimikami.me](mailto:hi@yimikami.me).
+> For bug reports, please include:
+>
+> - Plugin name and version
+> - Steps to reproduce the issue
+> - Expected vs actual behavior
+> - Any error messages you received
+> - Console logs (see below)
 
-Have fun!
+### 🔍 Getting Console Logs
+
+Most plugins include a debug mode that can help diagnose issues:
+
+1. Enable debug mode in the plugin settings:
+   ```js
+   CONFIG = {
+    debug: true; // Change this to true
+   };
+   ```
+2. Open Developer Tools in League Client:
+
+   - Press `Ctrl + Shift + I`
+
+3. Reproduce the issue
+4. Copy all relevant console logs
+5. Include these logs in your bug report
+
+---
+
+<div align="center">
+
+Made with ❤️ for the League community
+
+[Report Bug](https://github.com/Yimikami/pengu-plugins/issues/new?labels=bug&template=bug_report.md) · [Request Feature](https://github.com/Yimikami/pengu-plugins/issues/new?labels=enhancement&template=feature_request.md)
+
+</div>
