@@ -13,6 +13,26 @@
 
 ## 🔌 Available Plugins
 
+### 🔄 Rune Plugin (v0.0.1)
+
+> Automatically fetches and applies optimal runes from U.GG during champion select!
+
+**Key Features:**
+
+- 🔄 Auto-fetches optimal runes from U.GG
+- 🎯 Role-specific rune configurations
+
+<details>
+<summary>📖 Usage Guide</summary>
+
+1. Enter champion select
+2. Select your champion
+3. Runes will automatically be applied based on:
+   - Your assigned position
+   - Champion pick
+   - Latest U.GG data
+   </details>
+
 ### 🤖 ARAM Bot Enabler (v0.0.1)
 
 > Add bots to your ARAM custom games!
@@ -113,7 +133,8 @@
        ├── 📄 ProfileWinLose.js
        ├── 📄 MassReport.js
        ├── 📄 InstantRankedLobby.js
-       └── 📄 RandomizePlugin.js
+       ├── 📄 RandomizePlugin.js
+       └── 📄 RunePlugin.js
    ```
 3. Restart your League client
 
