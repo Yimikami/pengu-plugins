@@ -145,13 +145,13 @@ const RUNE_TREES = {
   8299: 8000,
 };
 
-function debugLog(message, data = null) {
-  if (CONFIG.debug) {
-    console.log(`${CONFIG.logPrefix} ${message}`, data ? data : "");
-  }
-}
-
 const utils = {
+  debugLog(message, data = null) {
+    if (CONFIG.debug) {
+      console.log(`${CONFIG.logPrefix} ${message}`, data ? data : "");
+    }
+  },
+
   async fetchWithRetry(url, options = {}, retries = CONFIG.retryAttempts) {
     try {
       const response = await fetch(url, options);
@@ -160,7 +160,7 @@ const utils = {
       return response;
     } catch (error) {
       if (retries > 0) {
-        debugLog(`Retrying request... Attempts left: ${retries}`);
+        utils.debugLog(`Retrying request... Attempts left: ${retries}`);
         await new Promise((resolve) => setTimeout(resolve, CONFIG.retryDelay));
         return this.fetchWithRetry(url, options, retries - 1);
       }
@@ -254,33 +254,33 @@ class LolalyticsRunePlugin {
     this.observers = [];
     this.sessionObserver = null;
     this.version = null;
-    debugLog("Plugin instance created");
+    utils.debugLog("Plugin instance created");
   }
 
   async init(context) {
     try {
-      debugLog("Initializing plugin...");
+      utils.debugLog("Initializing plugin...");
       await SettingsStore.loadSettings();
       await this.waitForClientInit();
 
       const versions = await utils.fetchJson(CONFIG.endpoints.versions);
       this.version = versions[0].split(".").slice(0, 2).join(".");
-      debugLog(`Using version: ${this.version}`);
+      utils.debugLog(`Using version: ${this.version}`);
 
       this.championData = await utils.getChampionData();
       if (this.championData) {
-        debugLog("Champion data loaded successfully", {
+        utils.debugLog("Champion data loaded successfully", {
           championCount: Object.keys(this.championData).length / 2,
         });
         await this.setupChampSelectSubscription(context.socket);
         this.setupCleanup();
         this.initializeSettings();
-        debugLog("Plugin initialization completed");
+        utils.debugLog("Plugin initialization completed");
       } else {
-        debugLog("Failed to load champion data", null, "error");
+        utils.debugLog("Failed to load champion data", null, "error");
       }
     } catch (error) {
-      debugLog("Error during initialization", error, "error");
+      utils.debugLog("Error during initialization", error, "error");
     }
   }
 
@@ -377,7 +377,7 @@ class LolalyticsRunePlugin {
     const providerKey = newProvider.toUpperCase();
     if (PROVIDERS[providerKey]) {
       CONFIG.selectedProvider = PROVIDERS[providerKey];
-      debugLog(`Provider changed to: ${CONFIG.selectedProvider}`);
+      utils.debugLog(`Provider changed to: ${CONFIG.selectedProvider}`);
       Toast.success(
         `Provider updated to: ${
           CONFIG.selectedProvider === PROVIDERS.UGG ? "U.GG" : "Lolalytics"
@@ -520,7 +520,7 @@ class LolalyticsRunePlugin {
   }
 
   async getRunesForChampion(championId, position) {
-    debugLog("Fetching runes", {
+    utils.debugLog("Fetching runes", {
       championId,
       position,
       provider: CONFIG.selectedProvider,
@@ -533,7 +533,7 @@ class LolalyticsRunePlugin {
   async getUGGRunes(championId, position) {
     try {
       const uggPosition = UGG.positionMapping[position] || UGG.positions.none;
-      debugLog("Fetching U.GG runes", {
+      utils.debugLog("Fetching U.GG runes", {
         championId,
         position: UGG.positionsReversed[uggPosition],
         uggPosition,
@@ -544,10 +544,10 @@ class LolalyticsRunePlugin {
       const requestUrl = `${SETTINGS.ugg.baseUrl}/${SETTINGS.ugg.statsVersion}/overview/${uggVersion}/${SETTINGS.ugg.gameMode}/${championId}/${SETTINGS.ugg.overviewVersion}.json`;
 
       const response = await utils.fetchJson(requestUrl);
-      debugLog("U.GG Raw Response", response);
+      utils.debugLog("U.GG Raw Response", response);
 
       if (!response?.[SETTINGS.ugg.server]?.[SETTINGS.ugg.tier]) {
-        debugLog(
+        utils.debugLog(
           "No data found for server/tier",
           {
             server: SETTINGS.ugg.server,
@@ -559,7 +559,7 @@ class LolalyticsRunePlugin {
       }
 
       const tierData = response[SETTINGS.ugg.server][SETTINGS.ugg.tier];
-      debugLog("U.GG Tier Data", tierData);
+      utils.debugLog("U.GG Tier Data", tierData);
 
       // If no position specified or position data not found, find the most played position
       let positionData;
@@ -582,25 +582,25 @@ class LolalyticsRunePlugin {
 
         if (bestPosition) {
           positionData = tierData[bestPosition][0];
-          debugLog("Using most played position", {
+          utils.debugLog("Using most played position", {
             position: UGG.positionsReversed[bestPosition],
             games: maxGames,
           });
         } else {
-          debugLog("No valid position data found", null, "error");
+          utils.debugLog("No valid position data found", null, "error");
           return null;
         }
       } else {
         positionData = tierData[uggPosition][0];
       }
 
-      debugLog("U.GG Position Data", positionData);
+      utils.debugLog("U.GG Position Data", positionData);
 
       const perks = positionData[0];
-      debugLog("U.GG Perks Data", perks);
+      utils.debugLog("U.GG Perks Data", perks);
 
       if (!perks || !Array.isArray(perks)) {
-        debugLog("Invalid perks data structure", perks, "error");
+        utils.debugLog("Invalid perks data structure", perks, "error");
         return null;
       }
 
@@ -612,7 +612,7 @@ class LolalyticsRunePlugin {
         .map((perk) => (Array.isArray(perk) ? perk[0] : perk))
         .concat(statShards);
 
-      debugLog("U.GG Processed Rune Data", {
+      utils.debugLog("U.GG Processed Rune Data", {
         mainPerk,
         subPerk,
         selectedPerkIds,
@@ -631,7 +631,7 @@ class LolalyticsRunePlugin {
         win: perks[0],
       };
     } catch (error) {
-      debugLog(
+      utils.debugLog(
         "Error fetching U.GG runes",
         {
           error: error.message,
@@ -675,7 +675,7 @@ class LolalyticsRunePlugin {
       const championName = utils.formatChampionName(
         this.championData[championId]
       );
-      debugLog("Fetching Lolalytics runes", {
+      utils.debugLog("Fetching Lolalytics runes", {
         championId,
         championName,
         position,
@@ -733,7 +733,7 @@ class LolalyticsRunePlugin {
         win: Math.round(runeData.n * (runeData.wr / 100)),
       };
     } catch (error) {
-      debugLog("Error fetching Lolalytics runes", error, "error");
+      utils.debugLog("Error fetching Lolalytics runes", error, "error");
       return null;
     }
   }
