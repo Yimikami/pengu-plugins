@@ -1,12 +1,93 @@
 /**
  * @name RunePlugin
  * @author Yimikami
- * @description Fetches optimal runes from U.GG for champions
+ * @description Fetches optimal runes based on U.GG and Lolalytics data
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.1
+ * @version 0.0.2
  */
 
-// U.GG constants
+import { settingsUtils } from "https://unpkg.com/blank-settings-utils@latest/Settings-Utils.js";
+
+let data = [
+  {
+    groupName: "rune-plugin",
+    titleKey: "el_rune_plugin",
+    titleName: "Rune Plugin",
+    capitalTitleKey: "el_rune_plugin_capital",
+    capitalTitleName: "RUNE PLUGIN",
+    element: [
+      {
+        name: "rune-plugin-settings",
+        title: "el_rune_plugin_settings",
+        titleName: "RUNE PLUGIN SETTINGS",
+        class: "rune-plugin-settings",
+        id: "runePluginSettings",
+      },
+    ],
+  },
+];
+
+const PROVIDERS = {
+  LOLALYTICS: "lolalytics",
+  UGG: "ugg",
+};
+
+const DEFAULT_CONFIG = {
+  retryAttempts: 3,
+  retryDelay: 1000,
+  selectedProvider: PROVIDERS.LOLALYTICS,
+  debug: false,
+  logPrefix: "[Rune Plugin]",
+  endpoints: {
+    championSummary: "/lol-game-data/assets/v1/champion-summary.json",
+    gamePhase: "/lol-gameflow/v1/gameflow-phase",
+    champSelect: "/lol-champ-select/v1/session",
+    perksPage: "/lol-perks/v1/pages",
+    currentPage: "/lol-perks/v1/currentpage",
+    versions: "https://ddragon.leagueoflegends.com/api/versions.json",
+  },
+  displayNames: {
+    top: "Top",
+    jungle: "Jungle",
+    middle: "Middle",
+    bottom: "ADC",
+    support: "Support",
+    utility: "Support",
+  },
+};
+
+// Configuration that will be loaded from DataStore
+let CONFIG = { ...DEFAULT_CONFIG };
+
+// DataStore functions
+const SettingsStore = {
+  async loadSettings() {
+    try {
+      const settings = DataStore.get("rune-plugin-settings");
+      if (settings) {
+        const userSettings = JSON.parse(settings);
+        // Only override user-configurable settings
+        CONFIG.selectedProvider =
+          userSettings.selectedProvider ?? DEFAULT_CONFIG.selectedProvider;
+      }
+    } catch (error) {
+      console.error("[RunePlugin] Error loading settings:", error);
+    }
+  },
+
+  async saveSettings() {
+    try {
+      // Only save user-configurable settings
+      const settings = {
+        selectedProvider: CONFIG.selectedProvider,
+      };
+      DataStore.set("rune-plugin-settings", JSON.stringify(settings));
+    } catch (error) {
+      console.error("[RunePlugin] Error saving settings:", error);
+    }
+  },
+};
+
 const UGG = {
   positions: {
     jungle: 1,
@@ -24,80 +105,62 @@ const UGG = {
     5: "Mid",
     6: "",
   },
-};
-
-const CONFIG = {
-  debug: false,
-  retryAttempts: 3,
-  retryDelay: 1000,
-  logPrefix: "[Rune Plugin]",
   positionMapping: {
-    TOP: UGG.positions.top,
-    JUNGLE: UGG.positions.jungle,
-    MIDDLE: UGG.positions.mid,
-    BOTTOM: UGG.positions.adc,
-    UTILITY: UGG.positions.support,
-    "": UGG.positions.none,
+    top: 4,
+    jungle: 1,
+    middle: 5,
+    bottom: 3,
+    support: 2,
+    utility: 2,
+    "": 6,
   },
-  defaultPosition: "MIDDLE",
 };
 
 const SETTINGS = {
-  baseOverviewUrl: "https://stats2.u.gg/lol",
-  statsVersion: "1.5",
-  overviewVersion: "1.5.0",
-  usedServer: 12,
-  /* 
-    na: 1,
-    euw: 2,
-    kr: 3,
-    eune: 4,
-    br: 5,
-    las: 6,
-    lan: 7,
-    oce: 8,
-    ru: 9,
-    tr: 10,
-    jp: 11,
-    world: 12
-  */
-  defaultTier: 10,
-  /* 
-    challenger: 1,
-    master: 2,
-    diamond: 3,
-    platinum: 4,
-    gold: 5,
-    silver: 6,
-    bronze: 7,
-    overall: 8,
-    platPlus: 10,
-    diaPlus: 11
-  */
-  defaultGameMode: "ranked_solo_5x5",
-  /* 
-    ranked_solo_5x5: "Ranked Solo/Duo",
-    normal_aram: "ARAM",
-  */
+  lolalytics: {
+    baseUrl: "https://a1.lolalytics.com/mega/",
+    tier: "platinum_plus",
+    queue: "ranked",
+    region: "all",
+  },
+  ugg: {
+    baseUrl: "https://stats2.u.gg/lol",
+    statsVersion: "1.5",
+    overviewVersion: "1.5.0",
+    server: 12,
+    tier: 10,
+    gameMode: "ranked_solo_5x5",
+  },
 };
 
-// Utility functions
-const utils = {
-  debugLog(message, data = null) {
-    if (CONFIG.debug) {
-      console.log(`${CONFIG.logPrefix} ${message}`, data ? data : "");
-    }
-  },
+const RUNE_TREES = {
+  8242: 8400,
+  8410: 8300,
+  9923: 8100,
+  9101: 8000,
+  9111: 8000,
+  9104: 8000,
+  9105: 8000,
+  9103: 8000,
+  8299: 8000,
+};
 
+function debugLog(message, data = null) {
+  if (CONFIG.debug) {
+    console.log(`${CONFIG.logPrefix} ${message}`, data ? data : "");
+  }
+}
+
+const utils = {
   async fetchWithRetry(url, options = {}, retries = CONFIG.retryAttempts) {
     try {
       const response = await fetch(url, options);
-      if (!response.ok) {
+      if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
-      }
       return response;
     } catch (error) {
       if (retries > 0) {
+        debugLog(`Retrying request... Attempts left: ${retries}`);
         await new Promise((resolve) => setTimeout(resolve, CONFIG.retryDelay));
         return this.fetchWithRetry(url, options, retries - 1);
       }
@@ -110,132 +173,231 @@ const utils = {
     return response.json();
   },
 
+  formatChampionName(name) {
+    return name
+      .toLowerCase()
+      .replace(/['\s]/g, "") // Remove apostrophes and spaces
+      .replace(/\./g, "") // Remove dots (e.g., Dr. Mundo)
+      .replace(/&/g, "and"); // Replace & with 'and'
+  },
+
   async getChampionData() {
     try {
-      const champions = await this.fetchJson(
-        "/lol-game-data/assets/v1/champion-summary.json"
-      );
+      const champions = await this.fetchJson(CONFIG.endpoints.championSummary);
       return champions.reduce((acc, champ) => {
-        acc[champ.name.toLowerCase()] = champ.id;
+        acc[this.formatChampionName(champ.name)] = champ.id;
         acc[champ.id] = champ.name;
         return acc;
       }, {});
     } catch (error) {
-      this.debugLog("Error fetching champion data:", error, "error");
       return null;
     }
   },
 
   async getCurrentPage() {
     try {
-      return await this.fetchJson("/lol-perks/v1/currentpage");
+      return await this.fetchJson(CONFIG.endpoints.currentPage);
     } catch (error) {
-      this.debugLog("Error getting current rune page:", error, "error");
       return null;
     }
   },
 
   async getPages() {
     try {
-      return await this.fetchJson("/lol-perks/v1/pages");
+      return await this.fetchJson(CONFIG.endpoints.perksPage);
     } catch (error) {
-      this.debugLog("Error getting rune pages:", error, "error");
       return null;
     }
   },
 
   async deletePage(id) {
     try {
-      await this.fetchWithRetry(`/lol-perks/v1/pages/${id}`, {
+      await this.fetchWithRetry(`${CONFIG.endpoints.perksPage}/${id}`, {
         method: "DELETE",
       });
       return true;
     } catch (error) {
-      this.debugLog("Error deleting rune page:", error, "error");
       return false;
     }
   },
 
   async createPage(page) {
     try {
-      return await this.fetchJson("/lol-perks/v1/pages", {
+      return await this.fetchJson(CONFIG.endpoints.perksPage, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(page),
       });
     } catch (error) {
-      this.debugLog("Error creating rune page:", error, "error");
       return null;
     }
   },
 
-  removePerkIds(perks) {
-    return perks.map((perk) => (Array.isArray(perk) ? perk[0] : perk));
+  getRuneTree(runeId) {
+    return RUNE_TREES[runeId] || Math.floor(runeId / 100) * 100;
+  },
+
+  getDisplayPosition(position, defaultLane) {
+    return (
+      CONFIG.displayNames[position] ||
+      (defaultLane && CONFIG.displayNames[defaultLane]) ||
+      ""
+    );
   },
 };
 
-class RunePlugin {
+class LolalyticsRunePlugin {
   constructor() {
     this.championData = null;
     this.lastAppliedRunes = null;
     this.isCreatingRunes = false;
-    this.observers = []; // Track observers for cleanup
-    this.sessionObserver = null; // Track session observer separately
-    utils.debugLog("Plugin instance created");
+    this.observers = [];
+    this.sessionObserver = null;
+    this.version = null;
+    debugLog("Plugin instance created");
   }
 
   async init(context) {
     try {
-      utils.debugLog("Initializing plugin...");
-
-      // Wait for client to be ready
+      debugLog("Initializing plugin...");
+      await SettingsStore.loadSettings();
       await this.waitForClientInit();
 
+      const versions = await utils.fetchJson(CONFIG.endpoints.versions);
+      this.version = versions[0].split(".").slice(0, 2).join(".");
+      debugLog(`Using version: ${this.version}`);
+
       this.championData = await utils.getChampionData();
-
       if (this.championData) {
-        utils.debugLog("Champion data loaded successfully", {
+        debugLog("Champion data loaded successfully", {
           championCount: Object.keys(this.championData).length / 2,
-          sampleChampions: Object.entries(this.championData).slice(0, 3),
         });
-
-        // Subscribe to champion select events using socket context
         await this.setupChampSelectSubscription(context.socket);
-
-        // Setup cleanup
         this.setupCleanup();
-
-        utils.debugLog("Plugin initialization completed");
+        this.initializeSettings();
+        debugLog("Plugin initialization completed");
       } else {
-        utils.debugLog("Failed to load champion data", null, "error");
+        debugLog("Failed to load champion data", null, "error");
       }
     } catch (error) {
-      utils.debugLog("Error during initialization", error, "error");
+      debugLog("Error during initialization", error, "error");
+    }
+  }
+
+  initializeSettings() {
+    const addSettings = () => {
+      const settingsContainer = document.querySelector(".rune-plugin-settings");
+      if (!settingsContainer) return;
+
+      settingsContainer.innerHTML = `
+        <div class="lol-settings-general-row">
+          <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <p class="lol-settings-window-size-text">Rune Provider:</p>
+              <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
+                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
+                  CONFIG.selectedProvider === PROVIDERS.LOLALYTICS
+                }" value="${PROVIDERS.LOLALYTICS}">
+                  Lolalytics
+                  <div class="lol-tooltip-component"></div>
+                </lol-uikit-dropdown-option>
+                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
+                  CONFIG.selectedProvider === PROVIDERS.UGG
+                }" value="${PROVIDERS.UGG}">
+                  U.GG
+                  <div class="lol-tooltip-component"></div>
+                </lol-uikit-dropdown-option>
+              </lol-uikit-framed-dropdown>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Provider dropdown
+      const providerDropdown = settingsContainer.querySelector(
+        "lol-uikit-framed-dropdown"
+      );
+      const providerOptions = providerDropdown.querySelectorAll(
+        "lol-uikit-dropdown-option"
+      );
+
+      // Set initial provider selected value
+      const currentProviderOption = Array.from(providerOptions).find(
+        (opt) => opt.getAttribute("value") === CONFIG.selectedProvider
+      );
+      if (currentProviderOption) {
+        providerOptions.forEach((opt) => opt.removeAttribute("selected"));
+        currentProviderOption.setAttribute("selected", "");
+        providerDropdown.setAttribute(
+          "selected-value",
+          CONFIG.selectedProvider
+        );
+        providerDropdown.setAttribute(
+          "selected-item",
+          CONFIG.selectedProvider === PROVIDERS.UGG ? "U.GG" : "Lolalytics"
+        );
+      }
+
+      providerOptions.forEach((option) => {
+        option.addEventListener("click", () => {
+          const value = option.getAttribute("value");
+          this.handleProviderChange(value);
+
+          // Update selected state
+          providerOptions.forEach((opt) => opt.removeAttribute("selected"));
+          option.setAttribute("selected", "");
+          providerDropdown.setAttribute("selected-value", value);
+          providerDropdown.setAttribute(
+            "selected-item",
+            value === PROVIDERS.UGG ? "U.GG" : "Lolalytics"
+          );
+        });
+      });
+    };
+
+    // Observe for settings container
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.classList?.contains("rune-plugin-settings")) {
+            addSettings();
+            return;
+          }
+        }
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  handleProviderChange(newProvider) {
+    const providerKey = newProvider.toUpperCase();
+    if (PROVIDERS[providerKey]) {
+      CONFIG.selectedProvider = PROVIDERS[providerKey];
+      debugLog(`Provider changed to: ${CONFIG.selectedProvider}`);
+      Toast.success(
+        `Provider updated to: ${
+          CONFIG.selectedProvider === PROVIDERS.UGG ? "U.GG" : "Lolalytics"
+        }`
+      );
+      SettingsStore.saveSettings();
+      this.lastAppliedRunes = null;
     }
   }
 
   async waitForClientInit() {
-    utils.debugLog("Waiting for client to be ready...");
-
-    // Wait for essential endpoints to be available
     const maxAttempts = 20;
     let attempts = 0;
 
     while (attempts < maxAttempts) {
       try {
-        // Try to fetch champion data to check if client is ready
-        const response = await fetch(
-          "/lol-game-data/assets/v1/champion-summary.json"
-        );
-        if (response.ok) {
-          utils.debugLog("Client is ready");
-          return;
-        }
+        const response = await fetch(CONFIG.endpoints.championSummary);
+        if (response.ok) return;
       } catch (error) {
         attempts++;
-        utils.debugLog(
-          `Waiting for client... Attempt ${attempts}/${maxAttempts}`
-        );
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
@@ -244,59 +406,30 @@ class RunePlugin {
   }
 
   async setupChampSelectSubscription(socket) {
-    if (!socket) {
-      utils.debugLog("Socket context not available", null, "error");
-      return;
-    }
-
-    utils.debugLog("Setting up champion select subscription");
+    if (!socket) return;
 
     try {
-      // Subscribe to champion select phase
       const phaseObserver = socket.observe(
-        "/lol-gameflow/v1/gameflow-phase",
+        CONFIG.endpoints.gamePhase,
         async (phase) => {
-          utils.debugLog("Game phase changed", phase);
           if (phase.data === "ChampSelect") {
-            utils.debugLog(
-              "Entered champion select - starting session observation"
-            );
-            // Start observing champion select session
             this.startChampSelectSession(socket);
           } else if (this.isChampSelectSessionActive()) {
-            utils.debugLog(
-              "Left champion select - stopping session observation"
-            );
-            // Stop observing champion select session
             this.stopChampSelectSession();
           }
         }
       );
       this.observers.push(phaseObserver);
-      utils.debugLog("Subscribed to game phase updates");
 
-      // Check current phase
-      try {
-        const response = await fetch("/lol-gameflow/v1/gameflow-phase");
-        if (response.ok) {
-          const phase = await response.text();
-          utils.debugLog("Current game phase", phase);
-          if (phase.data === "ChampSelect") {
-            utils.debugLog(
-              "Already in champion select - starting session observation"
-            );
-            this.startChampSelectSession(socket);
-          }
+      const response = await fetch(CONFIG.endpoints.gamePhase);
+      if (response.ok) {
+        const phase = await response.text();
+        if (phase.data === "ChampSelect") {
+          this.startChampSelectSession(socket);
         }
-      } catch (error) {
-        utils.debugLog("Error getting current game phase", error, "error");
       }
     } catch (error) {
-      utils.debugLog(
-        "Error setting up champion select subscription",
-        error,
-        "error"
-      );
+      // Silently handle errors
     }
   }
 
@@ -305,26 +438,18 @@ class RunePlugin {
   }
 
   startChampSelectSession(socket) {
-    if (this.isChampSelectSessionActive()) {
-      utils.debugLog("Champion select session observation already active");
-      return;
-    }
+    if (this.isChampSelectSessionActive()) return;
 
-    utils.debugLog("Starting champion select session observation");
     this.sessionObserver = socket.observe(
-      "/lol-champ-select/v1/session",
+      CONFIG.endpoints.champSelect,
       this.handleChampSelectUpdate.bind(this)
     );
     this.observers.push(this.sessionObserver);
   }
 
   stopChampSelectSession() {
-    if (!this.isChampSelectSessionActive()) {
-      utils.debugLog("No active champion select session to stop");
-      return;
-    }
+    if (!this.isChampSelectSessionActive()) return;
 
-    utils.debugLog("Stopping champion select session observation");
     const index = this.observers.indexOf(this.sessionObserver);
     if (index > -1) {
       this.observers.splice(index, 1);
@@ -333,159 +458,187 @@ class RunePlugin {
       this.sessionObserver.disconnect();
     }
     this.sessionObserver = null;
-    this.lastAppliedRunes = null; // Reset last applied runes when leaving champion select
+    this.lastAppliedRunes = null;
   }
 
   cleanup() {
-    // Stop champion select session if active
     if (this.isChampSelectSessionActive()) {
       this.stopChampSelectSession();
     }
 
-    // Disconnect all remaining observers
     this.observers.forEach((observer) => {
-      if (observer && observer.disconnect) {
-        observer.disconnect();
-      }
+      if (observer?.disconnect) observer.disconnect();
     });
     this.observers = [];
-    utils.debugLog("Cleaned up socket observers");
   }
 
-  // Add cleanup on window unload
   setupCleanup() {
-    utils.debugLog("Setting up cleanup handlers");
-    window.addEventListener("unload", () => {
-      this.cleanup();
-    });
+    window.addEventListener("unload", () => this.cleanup());
   }
 
   async handleChampSelectUpdate(event) {
-    if (!event?.data) {
-      utils.debugLog("Received empty champion select update", event);
-      return;
-    }
+    if (!event?.data?.myTeam) return;
 
-    utils.debugLog("Champion select session update received", event);
-    const session = event.data;
-
-    if (!session.myTeam) {
-      utils.debugLog("No team data in session", session);
-      return;
-    }
-
-    const myPlayer = session.myTeam.find(
-      (player) => player.cellId === session.localPlayerCellId
+    const myPlayer = event.data.myTeam.find(
+      (player) => player.cellId === event.data.localPlayerCellId
     );
 
-    if (!myPlayer) {
-      utils.debugLog("Could not find local player in team", session.myTeam);
-      return;
-    }
+    if (!myPlayer?.championId) return;
 
-    if (!myPlayer.championId || myPlayer.championId === 0) {
-      utils.debugLog("No champion selected yet", { playerId: myPlayer.cellId });
-      return;
-    }
+    const position = myPlayer.assignedPosition?.toLowerCase() || "";
+    if (this.shouldSkipRuneUpdate(myPlayer.championId, position)) return;
 
-    const rawPosition = myPlayer.assignedPosition || "";
-    const uggPosition =
-      CONFIG.positionMapping[rawPosition.toUpperCase()] ||
-      CONFIG.positionMapping[CONFIG.defaultPosition];
-
-    utils.debugLog("Processing champion select", {
-      championId: myPlayer.championId,
-      championName: this.championData[myPlayer.championId],
-      rawPosition: rawPosition,
-      mappedPosition: UGG.positionsReversed[uggPosition],
-      uggPositionId: uggPosition,
-    });
-
-    if (
-      this.shouldSkipRuneUpdate(myPlayer.championId, rawPosition, uggPosition)
-    ) {
-      utils.debugLog("Skipping rune update - conditions not met", {
-        championId: myPlayer.championId,
-        rawPosition: rawPosition,
-        mappedPosition: UGG.positionsReversed[uggPosition],
-        isCreatingRunes: this.isCreatingRunes,
-        lastApplied: this.lastAppliedRunes,
-      });
-      return;
-    }
-
-    await this.createRunesForChampion(
-      myPlayer.championId,
-      uggPosition,
-      rawPosition
-    );
+    await this.createRunesForChampion(myPlayer.championId, position);
   }
 
-  shouldSkipRuneUpdate(championId, position, uggPosition) {
-    if (this.isCreatingRunes) {
-      utils.debugLog("Skipping rune update - rune creation in progress", {
-        championId,
-      });
-      return true;
-    }
+  shouldSkipRuneUpdate(championId, position) {
+    if (this.isCreatingRunes) return true;
 
-    if (
+    return (
       this.lastAppliedRunes?.championId === championId &&
-      (this.lastAppliedRunes.position === uggPosition ||
-        (position === "" &&
-          this.lastAppliedRunes.position ===
-            CONFIG.positionMapping[CONFIG.defaultPosition]))
-    ) {
-      utils.debugLog("Skipping rune update - already applied", {
-        championId,
-        position: UGG.positionsReversed[uggPosition],
-      });
-      return true;
-    }
-
-    return false;
+      this.lastAppliedRunes.position === position
+    );
   }
 
-  async createRunesForChampion(championId, uggPosition, rawPosition) {
+  async createRunesForChampion(championId, position) {
     this.isCreatingRunes = true;
     try {
-      const uggRunes = await this.getRunesForChampion(championId, uggPosition);
-      if (uggRunes) {
-        this.lastAppliedRunes = {
+      const runeData = await this.getRunesForChampion(championId, position);
+      if (runeData) {
+        await this.createRunePage(
           championId,
-          position: uggPosition,
-        };
-        utils.debugLog("Runes applied successfully", {
-          championId,
-          championName: this.championData[championId],
-          rawPosition: rawPosition,
-          position: UGG.positionsReversed[uggPosition],
-          winRate: uggRunes.winRate,
-          match: uggRunes.match,
-          win: uggRunes.win,
-        });
+          runeData.selectedPerkIds,
+          runeData.displayPosition,
+          runeData.mainPerk,
+          runeData.subPerk
+        );
+        this.lastAppliedRunes = { championId, position };
       }
     } finally {
       this.isCreatingRunes = false;
     }
   }
 
-  async getOverviewJson(championId) {
+  async getRunesForChampion(championId, position) {
+    debugLog("Fetching runes", {
+      championId,
+      position,
+      provider: CONFIG.selectedProvider,
+    });
+    return CONFIG.selectedProvider === PROVIDERS.UGG
+      ? await this.getUGGRunes(championId, position)
+      : await this.getLolalyticsRunes(championId, position);
+  }
+
+  async getUGGRunes(championId, position) {
     try {
-      const versions = await utils.fetchJson(
-        "https://ddragon.leagueoflegends.com/api/versions.json"
-      );
-      const currentVersion = versions[0];
-      const uggVersion = currentVersion.split(".").slice(0, 2).join("_");
+      const uggPosition = UGG.positionMapping[position] || UGG.positions.none;
+      debugLog("Fetching U.GG runes", {
+        championId,
+        position: UGG.positionsReversed[uggPosition],
+        uggPosition,
+        version: this.version,
+      });
 
-      utils.debugLog(
-        `Using LoL version: ${currentVersion} (U.GG: ${uggVersion})`
-      );
+      const uggVersion = this.version.replace(".", "_");
+      const requestUrl = `${SETTINGS.ugg.baseUrl}/${SETTINGS.ugg.statsVersion}/overview/${uggVersion}/${SETTINGS.ugg.gameMode}/${championId}/${SETTINGS.ugg.overviewVersion}.json`;
 
-      const requestUrl = `${SETTINGS.baseOverviewUrl}/${SETTINGS.statsVersion}/overview/${uggVersion}/${SETTINGS.defaultGameMode}/${championId}/${SETTINGS.overviewVersion}.json`;
-      return await utils.fetchJson(requestUrl);
+      const response = await utils.fetchJson(requestUrl);
+      debugLog("U.GG Raw Response", response);
+
+      if (!response?.[SETTINGS.ugg.server]?.[SETTINGS.ugg.tier]) {
+        debugLog(
+          "No data found for server/tier",
+          {
+            server: SETTINGS.ugg.server,
+            tier: SETTINGS.ugg.tier,
+          },
+          "error"
+        );
+        return null;
+      }
+
+      const tierData = response[SETTINGS.ugg.server][SETTINGS.ugg.tier];
+      debugLog("U.GG Tier Data", tierData);
+
+      // If no position specified or position data not found, find the most played position
+      let positionData;
+      let bestPosition = null;
+      if (!position || !tierData[uggPosition]?.[0]) {
+        // Find position with highest number of games
+        let maxGames = 0;
+
+        // Check positions 1 through 5 (jungle through mid)
+        for (let pos = 1; pos <= 5; pos++) {
+          if (tierData[pos]?.[0]?.[0]?.[0]) {
+            // Check if position has data
+            const games = tierData[pos][0][0][0]; // Total games for this position
+            if (games > maxGames) {
+              maxGames = games;
+              bestPosition = pos;
+            }
+          }
+        }
+
+        if (bestPosition) {
+          positionData = tierData[bestPosition][0];
+          debugLog("Using most played position", {
+            position: UGG.positionsReversed[bestPosition],
+            games: maxGames,
+          });
+        } else {
+          debugLog("No valid position data found", null, "error");
+          return null;
+        }
+      } else {
+        positionData = tierData[uggPosition][0];
+      }
+
+      debugLog("U.GG Position Data", positionData);
+
+      const perks = positionData[0];
+      debugLog("U.GG Perks Data", perks);
+
+      if (!perks || !Array.isArray(perks)) {
+        debugLog("Invalid perks data structure", perks, "error");
+        return null;
+      }
+
+      const statShards =
+        positionData[8]?.[2]?.map((str) => parseInt(str, 10)) || [];
+      const mainPerk = perks[2];
+      const subPerk = perks[3];
+      const selectedPerkIds = perks[4]
+        .map((perk) => (Array.isArray(perk) ? perk[0] : perk))
+        .concat(statShards);
+
+      debugLog("U.GG Processed Rune Data", {
+        mainPerk,
+        subPerk,
+        selectedPerkIds,
+        statShards,
+      });
+
+      return {
+        selectedPerkIds,
+        mainPerk,
+        subPerk,
+        displayPosition: position
+          ? UGG.positionsReversed[uggPosition]
+          : UGG.positionsReversed[bestPosition],
+        winRate: ((perks[1] / perks[0]) * 100).toFixed(2) + "%",
+        matches: perks[1],
+        win: perks[0],
+      };
     } catch (error) {
-      utils.debugLog("Error fetching overview JSON:", error, "error");
+      debugLog(
+        "Error fetching U.GG runes",
+        {
+          error: error.message,
+          stack: error.stack,
+        },
+        "error"
+      );
       return null;
     }
   }
@@ -497,9 +650,6 @@ class RunePlugin {
     mainPerk,
     subPerk
   ) {
-    const championName = this.championData[championId];
-    utils.debugLog(`Creating rune page for ${championName}`);
-
     const pages = await utils.getPages();
     if (!pages) return null;
 
@@ -508,86 +658,89 @@ class RunePlugin {
       await utils.deletePage(currentPage?.id || pages[0].id);
     }
 
-    const newPage = {
-      name: `U.GG - ${championName} ${position}`,
+    const provider =
+      CONFIG.selectedProvider === PROVIDERS.UGG ? "U.GG" : "Lolalytics";
+    return await utils.createPage({
+      name: `${provider} - ${this.championData[championId]} ${position}`,
       primaryStyleId: mainPerk,
       subStyleId: subPerk,
       selectedPerkIds,
       current: true,
       order: 0,
-    };
-
-    const createdPage = await utils.createPage(newPage);
-    if (createdPage) {
-      utils.debugLog(`Successfully created rune page for ${championName}`);
-    }
-    return createdPage;
+    });
   }
 
-  async getRunesForChampion(championId, position) {
+  async getLolalyticsRunes(championId, position) {
     try {
-      const championName = this.championData[championId];
-      utils.debugLog(
-        `Fetching runes for ${championName} (${championId}) Position: ${UGG.positionsReversed[position]}`
+      const championName = utils.formatChampionName(
+        this.championData[championId]
       );
-
-      const overview = await this.getOverviewJson(championId);
-      if (!overview?.[SETTINGS.usedServer]?.[SETTINGS.defaultTier]) {
-        utils.debugLog("No valid data found", null, "error");
-        return null;
-      }
-
-      const tierData = overview[SETTINGS.usedServer][SETTINGS.defaultTier];
-      const positionData = tierData[position]?.[0];
-
-      if (!positionData) {
-        const defaultPosition = CONFIG.positionMapping[CONFIG.defaultPosition];
-        utils.debugLog(
-          `No data found for position ${UGG.positionsReversed[position]}, falling back to ${CONFIG.defaultPosition}`,
-          null,
-          "warn"
-        );
-        // Only fallback to default position if no data for the requested position
-        const defaultPositionData = tierData[defaultPosition]?.[0];
-        if (!defaultPositionData) {
-          utils.debugLog("No position data found", null, "error");
-          return null;
-        }
-        return this.getRunesForChampion(championId, defaultPosition);
-      }
-
-      const perks = positionData[0];
-      const statShards = positionData[8][2].map((str) => parseInt(str, 10));
-      const mainPerk = perks[2];
-      const subPerk = perks[3];
-      const selectedPerkIds = utils.removePerkIds(perks[4]).concat(statShards);
-
-      await this.createRunePage(
+      debugLog("Fetching Lolalytics runes", {
         championId,
-        selectedPerkIds,
-        UGG.positionsReversed[position],
-        mainPerk,
-        subPerk
+        championName,
+        position,
+      });
+
+      // Map utility to support for API request
+      const lane = position === "utility" ? "support" : position;
+
+      const params = new URLSearchParams({
+        ep: "rune",
+        v: "1",
+        patch: this.version,
+        c: championName,
+        tier: SETTINGS.lolalytics.tier,
+        queue: SETTINGS.lolalytics.queue,
+        region: SETTINGS.lolalytics.region,
+      });
+
+      if (lane) params.append("lane", lane);
+
+      const response = await utils.fetchJson(
+        `${SETTINGS.lolalytics.baseUrl}?${params.toString()}`
       );
+
+      if (!response?.summary?.runes?.pick) return null;
+
+      const runeData = response.summary.runes.pick;
+      const primaryRunes = runeData.set.pri;
+      const secondaryRunes = runeData.set.sec;
+
+      const mainPerk =
+        primaryRunes.length > 0
+          ? utils.getRuneTree(primaryRunes[0])
+          : 8000 + runeData.page.pri * 100;
+
+      const subPerk =
+        secondaryRunes.length > 0
+          ? utils.getRuneTree(secondaryRunes[0])
+          : 8000 + runeData.page.sec * 100;
 
       return {
-        selectedPerkIds,
+        selectedPerkIds: [
+          ...primaryRunes,
+          ...secondaryRunes,
+          ...runeData.set.mod,
+        ],
         mainPerk,
         subPerk,
-        position: UGG.positionsReversed[position],
-        winRate: ((perks[1] / perks[0]) * 100).toFixed(2) + "%",
-        match: perks[1],
-        win: perks[0],
+        displayPosition: utils.getDisplayPosition(
+          position,
+          response.header?.defaultLane
+        ),
+        winRate: runeData.wr.toFixed(2) + "%",
+        matches: runeData.n,
+        win: Math.round(runeData.n * (runeData.wr / 100)),
       };
     } catch (error) {
-      utils.debugLog("Error processing runes:", error, "error");
+      debugLog("Error fetching Lolalytics runes", error, "error");
       return null;
     }
   }
 }
 
-// Initialize plugin with context
 export function init(context) {
-  window.runePlugin = new RunePlugin();
-  window.runePlugin.init(context);
+  settingsUtils(window, data);
+  window.lolalyticsRunePlugin = new LolalyticsRunePlugin();
+  window.lolalyticsRunePlugin.init(context);
 }
