@@ -13,7 +13,7 @@
 
 ## 🔌 Available Plugins
 
-### �� Rune Plugin (v0.0.2)
+### 🔄 Rune Plugin (v0.0.2)
 
 > Automatically fetches and applies optimal runes from U.GG or Lolalytics during champion select!
 
@@ -23,6 +23,7 @@
 - 🔄 Configurable rune provider (U.GG/Lolalytics)
 - 🎯 Role-specific rune configurations
 - 📊 Uses latest patch data automatically
+- 📝 If no position provided, the plugin will analyze your champion pick and find most popular position for the champion and apply runes accordingly
 
 <details>
 <summary>📖 Usage Guide</summary>
