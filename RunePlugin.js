@@ -1,9 +1,9 @@
 /**
  * @name RunePlugin
  * @author Yimikami
- * @description Fetches optimal runes based on U.GG and Lolalytics data
+ * @description Fetches optimal runes and item sets based on U.GG and Lolalytics data
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.2
+ * @version 0.0.3
  */
 
 import { settingsUtils } from "https://unpkg.com/blank-settings-utils@latest/Settings-Utils.js";
@@ -36,7 +36,7 @@ const DEFAULT_CONFIG = {
   retryAttempts: 3,
   retryDelay: 1000,
   selectedProvider: PROVIDERS.LOLALYTICS,
-  debug: false,
+  debug: true,
   logPrefix: "[Rune Plugin]",
   endpoints: {
     championSummary: "/lol-game-data/assets/v1/champion-summary.json",
@@ -45,6 +45,8 @@ const DEFAULT_CONFIG = {
     perksPage: "/lol-perks/v1/pages",
     currentPage: "/lol-perks/v1/currentpage",
     versions: "https://ddragon.leagueoflegends.com/api/versions.json",
+    itemSets: "/lol-item-sets/v1/item-sets",
+    currentSummoner: "/lol-summoner/v1/current-summoner",
   },
   displayNames: {
     top: "Top",
@@ -53,6 +55,11 @@ const DEFAULT_CONFIG = {
     bottom: "ADC",
     support: "Support",
     utility: "Support",
+  },
+  itemSets: {
+    minGames: 1000, // Minimum games for winrate calculations
+    maps: [11, 12], // SR and ARAM
+    enabled: true, // Whether to create item sets
   },
 };
 
@@ -69,6 +76,8 @@ const SettingsStore = {
         // Only override user-configurable settings
         CONFIG.selectedProvider =
           userSettings.selectedProvider ?? DEFAULT_CONFIG.selectedProvider;
+        CONFIG.itemSets.enabled =
+          userSettings.itemSetsEnabled ?? DEFAULT_CONFIG.itemSets.enabled;
       }
     } catch (error) {
       console.error("[RunePlugin] Error loading settings:", error);
@@ -80,6 +89,7 @@ const SettingsStore = {
       // Only save user-configurable settings
       const settings = {
         selectedProvider: CONFIG.selectedProvider,
+        itemSetsEnabled: CONFIG.itemSets.enabled,
       };
       DataStore.set("rune-plugin-settings", JSON.stringify(settings));
     } catch (error) {
@@ -250,7 +260,9 @@ class LolalyticsRunePlugin {
   constructor() {
     this.championData = null;
     this.lastAppliedRunes = null;
+    this.lastAppliedItemSet = null;
     this.isCreatingRunes = false;
+    this.isCreatingItemSet = false;
     this.observers = [];
     this.sessionObserver = null;
     this.version = null;
@@ -309,14 +321,30 @@ class LolalyticsRunePlugin {
                 </lol-uikit-dropdown-option>
               </lol-uikit-framed-dropdown>
             </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <p class="lol-settings-window-size-text">Auto Item Sets:</p>
+              <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
+                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
+                  CONFIG.itemSets.enabled
+                }" value="true">
+                  Enabled
+                  <div class="lol-tooltip-component"></div>
+                </lol-uikit-dropdown-option>
+                <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${!CONFIG
+                  .itemSets.enabled}" value="false">
+                  Disabled
+                  <div class="lol-tooltip-component"></div>
+                </lol-uikit-dropdown-option>
+              </lol-uikit-framed-dropdown>
+            </div>
           </div>
         </div>
       `;
 
       // Provider dropdown
-      const providerDropdown = settingsContainer.querySelector(
+      const providerDropdown = settingsContainer.querySelectorAll(
         "lol-uikit-framed-dropdown"
-      );
+      )[0];
       const providerOptions = providerDropdown.querySelectorAll(
         "lol-uikit-dropdown-option"
       );
@@ -353,6 +381,47 @@ class LolalyticsRunePlugin {
           );
         });
       });
+
+      // Item Sets dropdown
+      const itemSetsDropdown = settingsContainer.querySelectorAll(
+        "lol-uikit-framed-dropdown"
+      )[1];
+      const itemSetsOptions = itemSetsDropdown.querySelectorAll(
+        "lol-uikit-dropdown-option"
+      );
+
+      // Set initial item sets selected value
+      const currentItemSetsOption = Array.from(itemSetsOptions).find(
+        (opt) => opt.getAttribute("value") === String(CONFIG.itemSets.enabled)
+      );
+      if (currentItemSetsOption) {
+        itemSetsOptions.forEach((opt) => opt.removeAttribute("selected"));
+        currentItemSetsOption.setAttribute("selected", "");
+        itemSetsDropdown.setAttribute(
+          "selected-value",
+          String(CONFIG.itemSets.enabled)
+        );
+        itemSetsDropdown.setAttribute(
+          "selected-item",
+          CONFIG.itemSets.enabled ? "Enabled" : "Disabled"
+        );
+      }
+
+      itemSetsOptions.forEach((option) => {
+        option.addEventListener("click", () => {
+          const value = option.getAttribute("value") === "true";
+          this.handleItemSetsChange(value);
+
+          // Update selected state
+          itemSetsOptions.forEach((opt) => opt.removeAttribute("selected"));
+          option.setAttribute("selected", "");
+          itemSetsDropdown.setAttribute("selected-value", String(value));
+          itemSetsDropdown.setAttribute(
+            "selected-item",
+            value ? "Enabled" : "Disabled"
+          );
+        });
+      });
     };
 
     // Observe for settings container
@@ -386,6 +455,14 @@ class LolalyticsRunePlugin {
       SettingsStore.saveSettings();
       this.lastAppliedRunes = null;
     }
+  }
+
+  handleItemSetsChange(enabled) {
+    CONFIG.itemSets.enabled = enabled;
+    utils.debugLog(`Item sets ${enabled ? "enabled" : "disabled"}`);
+    Toast.success(`Item sets ${enabled ? "enabled" : "disabled"}`);
+    SettingsStore.saveSettings();
+    this.lastAppliedItemSet = null;
   }
 
   async waitForClientInit() {
@@ -486,9 +563,18 @@ class LolalyticsRunePlugin {
     if (!myPlayer?.championId) return;
 
     const position = myPlayer.assignedPosition?.toLowerCase() || "";
-    if (this.shouldSkipRuneUpdate(myPlayer.championId, position)) return;
 
+    // Handle runes
+    if (this.shouldSkipRuneUpdate(myPlayer.championId, position)) return;
     await this.createRunesForChampion(myPlayer.championId, position);
+
+    // Handle item sets
+    if (
+      CONFIG.itemSets.enabled &&
+      !this.shouldSkipItemSetUpdate(myPlayer.championId, position)
+    ) {
+      await this.createItemSetForChampion(myPlayer.championId, position);
+    }
   }
 
   shouldSkipRuneUpdate(championId, position) {
@@ -735,6 +821,312 @@ class LolalyticsRunePlugin {
     } catch (error) {
       utils.debugLog("Error fetching Lolalytics runes", error, "error");
       return null;
+    }
+  }
+
+  shouldSkipItemSetUpdate(championId, position) {
+    if (this.isCreatingItemSet) return true;
+
+    return (
+      this.lastAppliedItemSet?.championId === championId &&
+      this.lastAppliedItemSet.position === position
+    );
+  }
+
+  async createItemSetForChampion(championId, position) {
+    this.isCreatingItemSet = true;
+    try {
+      const itemSetData = await this.getItemSetData(championId, position);
+      if (itemSetData) {
+        await this.createItemSet(championId, itemSetData, position);
+        this.lastAppliedItemSet = { championId, position };
+      }
+    } finally {
+      this.isCreatingItemSet = false;
+    }
+  }
+
+  async getItemSetData(championId, position) {
+    const championName = utils.formatChampionName(
+      this.championData[championId]
+    );
+    utils.debugLog("Fetching item sets", {
+      championId,
+      championName,
+      position,
+    });
+
+    // Map utility to support for API request
+    const lane = position === "utility" ? "support" : position;
+
+    const params = new URLSearchParams({
+      ep: "build-itemset",
+      v: "1",
+      patch: this.version,
+      c: championName,
+      tier: SETTINGS.lolalytics.tier,
+      queue: SETTINGS.lolalytics.queue,
+      region: SETTINGS.lolalytics.region,
+    });
+
+    if (lane) params.append("lane", lane);
+
+    const response = await utils.fetchJson(
+      `${SETTINGS.lolalytics.baseUrl}?${params.toString()}`
+    );
+
+    return response?.itemSets || null;
+  }
+
+  processItemSets(itemSets) {
+    utils.debugLog("Processing item sets", itemSets);
+
+    // Process 3-item core builds (itemSet3)
+    const popularCore = (itemSets.itemSet3 || [])
+      .filter((item) => item && item[0] && item[0].includes("_"))
+      .sort((a, b) => b[1] - a[1]) // Sort by total games
+      .slice(0, 1)
+      .map((item) => {
+        const games = item[1];
+        return {
+          items: item[0].split("_").map((id) => ({
+            id,
+            count: 1,
+          })),
+          games,
+        };
+      })[0] || { items: [], games: 0 };
+
+    // Process 5-item builds (itemSet5)
+    const popularFull = (itemSets.itemSet5 || [])
+      .filter((item) => item && item[0] && item[0].includes("_"))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 1)
+      .map((item) => {
+        const games = item[1];
+        return {
+          items: item[0].split("_").map((id) => ({
+            id,
+            count: 1,
+          })),
+          games,
+        };
+      })[0] || { items: [], games: 0 };
+
+    // Process winrate 3-item core builds with fallback
+    let winrateCore = (itemSets.itemSet3 || [])
+      .filter(
+        (item) =>
+          item &&
+          item[0] &&
+          item[0].includes("_") &&
+          item[1] >= CONFIG.itemSets.minGames
+      )
+      .sort((a, b) => b[2] / b[1] - a[2] / a[1]) // Sort by winrate
+      .slice(0, 1)
+      .map((item) => {
+        const winrate = ((item[2] / item[1]) * 100).toFixed(1);
+        return {
+          items: item[0].split("_").map((id) => ({
+            id,
+            count: 1,
+          })),
+          winrate,
+        };
+      })[0];
+
+    // Fallback for winrate core if no data meets minimum games threshold
+    if (!winrateCore) {
+      winrateCore = (itemSets.itemSet3 || [])
+        .filter((item) => item && item[0] && item[0].includes("_"))
+        .sort((a, b) => b[2] / b[1] - a[2] / a[1]) // Sort by winrate
+        .slice(0, 1)
+        .map((item) => {
+          const winrate = ((item[2] / item[1]) * 100).toFixed(1);
+          return {
+            items: item[0].split("_").map((id) => ({
+              id,
+              count: 1,
+            })),
+            winrate,
+          };
+        })[0] || { items: [], winrate: 0 };
+    }
+
+    // Process winrate 5-item builds with fallback
+    let winrateFull = (itemSets.itemSet5 || [])
+      .filter(
+        (item) =>
+          item &&
+          item[0] &&
+          item[0].includes("_") &&
+          item[1] >= CONFIG.itemSets.minGames
+      )
+      .sort((a, b) => b[2] / b[1] - a[2] / a[1]) // Sort by winrate
+      .slice(0, 1)
+      .map((item) => {
+        const winrate = ((item[2] / item[1]) * 100).toFixed(1);
+        return {
+          items: item[0].split("_").map((id) => ({
+            id,
+            count: 1,
+          })),
+          winrate,
+        };
+      })[0];
+
+    // Fallback for winrate full build if no data meets minimum games threshold
+    if (!winrateFull) {
+      winrateFull = (itemSets.itemSet5 || [])
+        .filter((item) => item && item[0] && item[0].includes("_"))
+        .sort((a, b) => b[2] / b[1] - a[2] / a[1]) // Sort by winrate
+        .slice(0, 1)
+        .map((item) => {
+          const winrate = ((item[2] / item[1]) * 100).toFixed(1);
+          return {
+            items: item[0].split("_").map((id) => ({
+              id,
+              count: 1,
+            })),
+            winrate,
+          };
+        })[0] || { items: [], winrate: 0 };
+    }
+
+    // Get all items that are already in other blocks
+    const usedItems = new Set([
+      ...popularCore.items.map((item) => item.id),
+      ...popularFull.items.map((item) => item.id),
+      ...winrateCore.items.map((item) => item.id),
+      ...winrateFull.items.map((item) => item.id),
+    ]);
+
+    // Process situational items (excluding already used items)
+    const situational = (itemSets.itemSet1 || [])
+      .filter((item) => {
+        return item && item[0] && !usedItems.has(item[0]);
+      })
+      .sort((a, b) => b[1] - a[1]) // Sort by total games
+      .slice(0, 6)
+      .map((item) => ({
+        id: item[0],
+        count: 1,
+      }));
+
+    utils.debugLog("Processed builds", {
+      popularCore,
+      popularFull,
+      winrateCore,
+      winrateFull,
+      situational,
+    });
+
+    return {
+      popularCore,
+      popularFull,
+      winrateCore,
+      winrateFull,
+      situational,
+    };
+  }
+
+  async createItemSet(championId, itemSets, position) {
+    try {
+      const currentSummoner = await utils.fetchJson(
+        CONFIG.endpoints.currentSummoner
+      );
+      if (!currentSummoner?.summonerId) return;
+
+      const builds = this.processItemSets(itemSets);
+      const provider =
+        CONFIG.selectedProvider === PROVIDERS.UGG ? "U.GG" : "Lolalytics";
+
+      // First get existing item sets
+      const existingSets = await utils.fetchJson(
+        `${CONFIG.endpoints.itemSets}/${currentSummoner.summonerId}/sets`
+      );
+
+      // Create new item set
+      const newItemSet = {
+        uid: crypto.randomUUID(),
+        title: `${provider} - ${
+          this.championData[championId]
+        } ${utils.getDisplayPosition(position)}`,
+        associatedChampions: [championId],
+        associatedMaps: CONFIG.itemSets.maps,
+        blocks: [
+          {
+            hideIfSummonerSpell: "",
+            showIfSummonerSpell: "",
+            items:
+              builds.popularCore.items.length > 0
+                ? builds.popularCore.items
+                : [{ id: "0", count: 1 }],
+            type: `Most Popular Core Items - ${builds.popularCore.games.toLocaleString()} games`,
+          },
+          {
+            hideIfSummonerSpell: "",
+            showIfSummonerSpell: "",
+            items: builds.popularFull.items,
+            type: `Most Popular Full Build - ${builds.popularFull.games.toLocaleString()} games`,
+          },
+          {
+            hideIfSummonerSpell: "",
+            showIfSummonerSpell: "",
+            items: builds.winrateCore.items,
+            type: `Highest Winrate Core - ${builds.winrateCore.winrate}% WR`,
+          },
+          {
+            hideIfSummonerSpell: "",
+            showIfSummonerSpell: "",
+            items: builds.winrateFull.items,
+            type: `Highest Winrate Full Build - ${builds.winrateFull.winrate}% WR`,
+          },
+          {
+            hideIfSummonerSpell: "",
+            showIfSummonerSpell: "",
+            items: builds.situational,
+            type: "Situational Items",
+          },
+        ],
+        preferredItemSlots: [],
+        sortrank: 0,
+        map: "any",
+        mode: "any",
+        startedFrom: "blank",
+        type: "custom",
+      };
+
+      // Filter out old item sets with the same champion and provider
+      const oldItemSets = existingSets?.itemSets || [];
+      const filteredSets = oldItemSets.filter(
+        (set) => !set.title.includes("Lolalytics")
+      );
+
+      utils.debugLog("Creating item set", { builds, newItemSet });
+
+      // Update item sets with PUT
+      const response = await utils.fetchWithRetry(
+        `${CONFIG.endpoints.itemSets}/${currentSummoner.summonerId}/sets`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            accountId: currentSummoner.accountId,
+            itemSets: [...filteredSets, newItemSet],
+            timestamp: Date.now(),
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Failed to create item set: ${error.message}`);
+      }
+
+      utils.debugLog("Item set created successfully", newItemSet);
+    } catch (error) {
+      utils.debugLog("Error creating item set", error);
     }
   }
 }

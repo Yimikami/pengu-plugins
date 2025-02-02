@@ -13,15 +13,18 @@
 
 ## 🔌 Available Plugins
 
-### 🔄 Rune Plugin (v0.0.2)
+### 🔄 Rune Plugin (v0.0.3)
 
-> Automatically fetches and applies optimal runes from U.GG or Lolalytics during champion select!
+> Automatically fetches and applies optimal runes and item sets from U.GG or Lolalytics during champion select!
 
 **Key Features:**
 
 - 🔄 Auto-fetches optimal runes from U.GG or Lolalytics
+
+- 📦 Auto-creates optimal item sets from Lolalytics
 - 🔄 Configurable rune provider (U.GG/Lolalytics)
-- 🎯 Role-specific rune configurations
+- ⚙️ Toggle item sets feature on/off
+- 🎯 Role-specific rune and item configurations
 - 📊 Uses latest patch data automatically
 - 📝 If no position provided, the plugin will analyze your champion pick and find most popular position for the champion and apply runes accordingly
 
@@ -34,10 +37,17 @@
    - Your assigned position
    - Champion pick
    - Latest data from your chosen provider
-4. Configure your preferred provider in plugin settings:
+4. Item sets will be created with:
+   - Most popular core items
+   - Most popular full build
+   - Highest winrate core items
+   - Highest winrate full build
+   - Situational items
+5. Configure your preferences in plugin settings:
    - Open client settings
    - Navigate to the Rune Plugin section
    - Select either U.GG or Lolalytics as your provider
+   - Enable or disable automatic item sets
    </details>
 
 ### 🤖 ARAM Bot Enabler (v0.0.1)
