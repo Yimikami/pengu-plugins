@@ -36,7 +36,7 @@ const DEFAULT_CONFIG = {
   retryAttempts: 3,
   retryDelay: 1000,
   selectedProvider: PROVIDERS.LOLALYTICS,
-  debug: true,
+  debug: false,
   logPrefix: "[Rune Plugin]",
   endpoints: {
     championSummary: "/lol-game-data/assets/v1/champion-summary.json",

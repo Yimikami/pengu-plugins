@@ -111,25 +111,6 @@
 4. Monitor toast notifications
 </details>
 
-### 🎲 Randomize Plugin (OUTDATED)
-
-> Add excitement to your games with random selections!
-
-**Key Features:**
-
-- 🎭 Random champion selection
-- 🎯 Random runes configuration
-- ⚔️ Random summoner spells
-- 🛠️ Random item builds
-- 📚 Random skill order
-
-<details>
-<summary>📖 Usage Guide</summary>
-
-1. Enter champion select
-2. Find the "LET THE FUN BEGIN 🤡" button
-3. Click and enjoy the randomness!
-</details>
 
 ### ⚡ Instant Ranked Lobby (v0.0.1)
 
@@ -150,7 +131,6 @@
        ├── 📄 ProfileWinLose.js
        ├── 📄 MassReport.js
        ├── 📄 InstantRankedLobby.js
-       ├── 📄 RandomizePlugin.js
        └── 📄 RunePlugin.js
    ```
 3. Restart your League client
