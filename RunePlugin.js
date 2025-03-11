@@ -3,7 +3,7 @@
  * @author Yimikami
  * @description Fetches optimal runes and item sets based on U.GG and Lolalytics data
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.3
+ * @version 0.0.4
  */
 
 import { settingsUtils } from "https://unpkg.com/blank-settings-utils@latest/Settings-Utils.js";
@@ -47,6 +47,7 @@ const DEFAULT_CONFIG = {
     versions: "https://ddragon.leagueoflegends.com/api/versions.json",
     itemSets: "/lol-item-sets/v1/item-sets",
     currentSummoner: "/lol-summoner/v1/current-summoner",
+    gameflowSession: "/lol-gameflow/v1/session",
   },
   displayNames: {
     top: "Top",
@@ -266,6 +267,7 @@ class LolalyticsRunePlugin {
     this.observers = [];
     this.sessionObserver = null;
     this.version = null;
+    this.currentGameMode = null;
     utils.debugLog("Plugin instance created");
   }
 
@@ -564,9 +566,13 @@ class LolalyticsRunePlugin {
 
     const position = myPlayer.assignedPosition?.toLowerCase() || "";
 
-    // Handle runes
-    if (this.shouldSkipRuneUpdate(myPlayer.championId, position)) return;
-    await this.createRunesForChampion(myPlayer.championId, position);
+    // Check if we're in Arena mode
+    await this.checkGameMode();
+    
+    // Handle runes (skip for Arena mode)
+    if (this.currentGameMode !== "CHERRY" && !this.shouldSkipRuneUpdate(myPlayer.championId, position)) {
+      await this.createRunesForChampion(myPlayer.championId, position);
+    }
 
     // Handle item sets
     if (
@@ -574,6 +580,18 @@ class LolalyticsRunePlugin {
       !this.shouldSkipItemSetUpdate(myPlayer.championId, position)
     ) {
       await this.createItemSetForChampion(myPlayer.championId, position);
+    }
+  }
+
+  async checkGameMode() {
+    try {
+      const gameflowSession = await utils.fetchJson(CONFIG.endpoints.gameflowSession);
+      if (gameflowSession?.gameData?.queue?.gameMode) {
+        this.currentGameMode = gameflowSession.gameData.queue.gameMode;
+        utils.debugLog(`Current game mode: ${this.currentGameMode}`);
+      }
+    } catch (error) {
+      utils.debugLog("Error checking game mode", error);
     }
   }
 
@@ -854,8 +872,28 @@ class LolalyticsRunePlugin {
       championId,
       championName,
       position,
+      gameMode: this.currentGameMode,
     });
 
+    // Check if we're in Arena mode
+    if (this.currentGameMode === "CHERRY") {
+      const params = new URLSearchParams({
+        ep: "arena-itemset",
+        v: "1",
+        patch: this.version,
+        c: championName,
+        tier: SETTINGS.lolalytics.tier,
+        region: SETTINGS.lolalytics.region,
+      });
+
+      const response = await utils.fetchJson(
+        `${SETTINGS.lolalytics.baseUrl}?${params.toString()}`
+      );
+
+      return response?.itemSets || null;
+    }
+
+    // Normal mode - use existing logic
     // Map utility to support for API request
     const lane = position === "utility" ? "support" : position;
 
@@ -880,7 +918,13 @@ class LolalyticsRunePlugin {
 
   processItemSets(itemSets) {
     utils.debugLog("Processing item sets", itemSets);
+    
+    // Check if we're processing Arena mode item sets (they have different structure)
+    if (this.currentGameMode === "CHERRY") {
+      return this.processArenaItemSets(itemSets);
+    }
 
+    // Regular item sets processing (non-Arena mode)
     // Process 3-item core builds (itemSet3)
     const popularCore = (itemSets.itemSet3 || [])
       .filter((item) => item && item[0] && item[0].includes("_"))
@@ -913,6 +957,9 @@ class LolalyticsRunePlugin {
         };
       })[0] || { items: [], games: 0 };
 
+    // Check if we're in Arena mode - don't use minimum games requirement for Arena
+    const minGames = this.currentGameMode === "CHERRY" ? 0 : CONFIG.itemSets.minGames;
+
     // Process winrate 3-item core builds with fallback
     let winrateCore = (itemSets.itemSet3 || [])
       .filter(
@@ -920,7 +967,7 @@ class LolalyticsRunePlugin {
           item &&
           item[0] &&
           item[0].includes("_") &&
-          item[1] >= CONFIG.itemSets.minGames
+          item[1] >= minGames
       )
       .sort((a, b) => b[2] / b[1] - a[2] / a[1]) // Sort by winrate
       .slice(0, 1)
@@ -960,7 +1007,7 @@ class LolalyticsRunePlugin {
           item &&
           item[0] &&
           item[0].includes("_") &&
-          item[1] >= CONFIG.itemSets.minGames
+          item[1] >= minGames
       )
       .sort((a, b) => b[2] / b[1] - a[2] / a[1]) // Sort by winrate
       .slice(0, 1)
@@ -1030,6 +1077,96 @@ class LolalyticsRunePlugin {
     };
   }
 
+  // Process Arena mode item sets which have a different format
+  processArenaItemSets(itemSets) {
+    utils.debugLog("Processing Arena item sets", itemSets);
+    
+    // For Arena, we primarily look at itemSet4 which contains build data
+    const itemSet4 = itemSets.itemSet4 || [];
+    
+    // Process popular 4-item core builds for Arena
+    const popularCore = itemSet4
+      .filter((item) => item && item[0] && item[0].includes("_"))
+      .sort((a, b) => b[1] - a[1]) // Sort by total games
+      .slice(0, 1)
+      .map((item) => {
+        const games = item[1];
+        return {
+          items: item[0].split("_").map((id) => ({
+            id: id,
+            count: 1,
+          })),
+          games,
+        };
+      })[0] || { items: [], games: 0 };
+    
+    // Get popular full build (using the same data but all items)
+    const popularFull = { ...popularCore };
+    
+    // Process highest winrate builds
+    const winrateCore = itemSet4
+      .filter((item) => item && item[0] && item[0].includes("_") && item[1] >= 50) // At least 50 games
+      .sort((a, b) => b[2] / b[1] - a[2] / a[1]) // Sort by winrate
+      .slice(0, 1)
+      .map((item) => {
+        const winrate = ((item[2] / item[1]) * 100).toFixed(1);
+        return {
+          items: item[0].split("_").map((id) => ({
+            id: id,
+            count: 1,
+          })),
+          winrate,
+        };
+      })[0] || { items: [], winrate: 0 };
+    
+    // Get winrate full build (using the same data but all items)  
+    const winrateFull = { ...winrateCore };
+    
+    // Get all items that are already in other blocks
+    const usedItems = new Set([
+      ...popularCore.items.map((item) => item.id),
+      ...winrateCore.items.map((item) => item.id),
+    ]);
+    
+    // Process situational items (get items from other popular builds not already included)
+    const situational = itemSet4
+      .filter((item) => {
+        if (!item || !item[0] || !item[0].includes("_")) return false;
+        // Check if it has any items not in the used set
+        const itemIds = item[0].split("_").map(id => id);
+        return itemIds.some(id => !usedItems.has(id));
+      })
+      .sort((a, b) => b[1] - a[1]) // Sort by total games
+      .slice(0, 10)
+      .flatMap((item) => {
+        // Extract only the items not already used
+        return item[0].split("_")
+          .map(id => id)
+          .filter(id => !usedItems.has(id))
+          .map(id => {
+            usedItems.add(id); // Add to used set to avoid duplicates
+            return { id, count: 1 };
+          });
+      })
+      .slice(0, 6); // Limit to 6 situational items
+    
+    utils.debugLog("Processed Arena builds", {
+      popularCore,
+      popularFull,
+      winrateCore,
+      winrateFull,
+      situational,
+    });
+    
+    return {
+      popularCore,
+      popularFull,
+      winrateCore,
+      winrateFull,
+      situational,
+    };
+  }
+
   async createItemSet(championId, itemSets, position) {
     try {
       const currentSummoner = await utils.fetchJson(
@@ -1040,6 +1177,9 @@ class LolalyticsRunePlugin {
       const builds = this.processItemSets(itemSets);
       const provider =
         CONFIG.selectedProvider === PROVIDERS.UGG ? "U.GG" : "Lolalytics";
+      
+      // Add Arena indicator to title if in Arena mode
+      const modeIndicator = this.currentGameMode === "CHERRY" ? " Arena" : "";
 
       // First get existing item sets
       const existingSets = await utils.fetchJson(
@@ -1049,11 +1189,11 @@ class LolalyticsRunePlugin {
       // Create new item set
       const newItemSet = {
         uid: crypto.randomUUID(),
-        title: `${provider} - ${
+        title: `${provider}${modeIndicator} - ${
           this.championData[championId]
         } ${utils.getDisplayPosition(position)}`,
         associatedChampions: [championId],
-        associatedMaps: CONFIG.itemSets.maps,
+        associatedMaps: this.currentGameMode === "CHERRY" ? [] : CONFIG.itemSets.maps,
         blocks: [
           {
             hideIfSummonerSpell: "",
@@ -1062,25 +1202,33 @@ class LolalyticsRunePlugin {
               builds.popularCore.items.length > 0
                 ? builds.popularCore.items
                 : [{ id: "0", count: 1 }],
-            type: `Most Popular Core Items - ${builds.popularCore.games.toLocaleString()} games`,
+            type: this.currentGameMode === "CHERRY"
+              ? `Most Popular Arena Build - ${builds.popularCore.games.toLocaleString()} games`
+              : `Most Popular Core Items - ${builds.popularCore.games.toLocaleString()} games`,
           },
           {
             hideIfSummonerSpell: "",
             showIfSummonerSpell: "",
             items: builds.popularFull.items,
-            type: `Most Popular Full Build - ${builds.popularFull.games.toLocaleString()} games`,
+            type: this.currentGameMode === "CHERRY"
+              ? `Popular Full Arena Build - ${builds.popularFull.games.toLocaleString()} games`
+              : `Most Popular Full Build - ${builds.popularFull.games.toLocaleString()} games`,
           },
           {
             hideIfSummonerSpell: "",
             showIfSummonerSpell: "",
             items: builds.winrateCore.items,
-            type: `Highest Winrate Core - ${builds.winrateCore.winrate}% WR`,
+            type: this.currentGameMode === "CHERRY"
+              ? `Highest Winrate Arena Build - ${builds.winrateCore.winrate}% WR`
+              : `Highest Winrate Core - ${builds.winrateCore.winrate}% WR`,
           },
           {
             hideIfSummonerSpell: "",
             showIfSummonerSpell: "",
             items: builds.winrateFull.items,
-            type: `Highest Winrate Full Build - ${builds.winrateFull.winrate}% WR`,
+            type: this.currentGameMode === "CHERRY"
+              ? `Highest Winrate Full Arena Build - ${builds.winrateFull.winrate}% WR`
+              : `Highest Winrate Full Build - ${builds.winrateFull.winrate}% WR`,
           },
           {
             hideIfSummonerSpell: "",
@@ -1092,7 +1240,7 @@ class LolalyticsRunePlugin {
         preferredItemSlots: [],
         sortrank: 0,
         map: "any",
-        mode: "any",
+        mode: this.currentGameMode === "CHERRY" ? "CHERRY" : "any",
         startedFrom: "blank",
         type: "custom",
       };
