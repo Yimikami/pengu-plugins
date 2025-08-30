@@ -33,6 +33,6 @@ assignees: ""
 - [ ] ARAM Bot Enabler
 - [ ] Profile Win/Loss Display
 - [ ] Mass Report Plugin
-- [ ] Randomize Plugin
+- [ ] Icon Swapper
 - [ ] Instant Ranked Lobby
-- [ ] New Plugin
+- [ ] Rune Plugin

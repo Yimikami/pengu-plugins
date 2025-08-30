@@ -112,7 +112,6 @@
 4. Monitor toast notifications
 </details>
 
-
 ### ⚡ Instant Ranked Lobby (v0.0.1)
 
 > Quick access to ranked games!
@@ -120,6 +119,26 @@
 **Feature:**
 
 - 🚀 Instantly creates solo/duo ranked lobby when pressing play button
+
+### 🎭 Icon Swapper (v0.0.1)
+
+> Change your summoner icon to any available icon from Community Dragon!
+
+**Key Features:**
+
+- 🎯 Fetches all available summoner icons from Community Dragon API
+- 🔄 Changes icons in hover cards, profiles, and party elements
+- 💾 Saves selected icon to DataStore for persistence
+- ↩️ Revert button to restore original icon
+- ⌨️ Command Bar integration for quick access
+
+<details>
+<summary>📖 Usage Guide</summary>
+
+1. Use Command Bar (Ctrl+K) and select desired icon
+
+2. Enable debug mode in plugin settings for detailed logging
+</details>
 
 ## ⚡ Quick Installation
 
@@ -132,7 +151,8 @@
        ├── 📄 ProfileWinLose.js
        ├── 📄 MassReport.js
        ├── 📄 InstantRankedLobby.js
-       └── 📄 RunePlugin.js
+       ├── 📄 RunePlugin.js
+       └── 📄 IconSwapper.js
    ```
 3. Restart your League client
 

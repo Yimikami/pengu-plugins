@@ -9,6 +9,10 @@
 (() => {
   // Constants
   const CONFIG = {
+    debug: {
+      enabled: false, // Set to true to enable debug mode
+      prefix: "[ARAMBotEnabler]",
+    },
     selectors: {
       botButton: "lol-uikit-flat-button-secondary[disabled]",
       eligibilityList: ".parties-point-eligibility-list",
@@ -29,6 +33,13 @@
     },
   };
 
+  // Debug utility function
+  const debug = (...args) => {
+    if (CONFIG.debug.enabled) {
+      console.log(CONFIG.debug.prefix, ...args);
+    }
+  };
+
   // Utility functions
   const debounce = (func, wait) => {
     let timeout;
@@ -44,6 +55,7 @@
 
   class AramBotEnabler {
     constructor() {
+      debug("Initializing ARAM Bot Enabler");
       this.botSelect = null;
       this.difficultySelect = null;
       this.availableBots = [];
@@ -55,22 +67,27 @@
 
     async init() {
       try {
+        debug("Starting initialization");
         await this.loadBots();
         this.observeDOM();
         this.enableAramBots();
         this.setupCleanup();
+        debug("Initialization completed successfully");
       } catch (error) {
         console.error("Failed to initialize ARAM Bot Enabler:", error);
+        debug("Initialization failed:", error);
       }
     }
 
     setupCleanup() {
+      debug("Setting up cleanup handlers");
       window.addEventListener("unload", () => {
         this.cleanup();
       });
     }
 
     cleanup() {
+      debug("Cleaning up resources");
       if (this.observer) {
         this.observer.disconnect();
         this.observer = null;
@@ -79,13 +96,16 @@
 
     async loadBots() {
       try {
+        debug("Loading bots data");
         // Try to load from cache first
         const cached = this.loadFromCache();
         if (cached) {
+          debug("Loaded bots from cache:", cached.length, "bots");
           this.availableBots = cached;
           return;
         }
 
+        debug("Fetching bots from API:", CONFIG.api.bots);
         const response = await fetch(CONFIG.api.bots);
         if (!response.ok)
           throw new Error(`Failed to load bots: ${response.status}`);
@@ -94,42 +114,51 @@
           a.name.localeCompare(b.name)
         );
 
+        debug("Loaded bots from API:", this.availableBots.length, "bots");
+
         // Cache the results
         this.saveToCache(this.availableBots);
       } catch (error) {
         console.error("Error loading bots:", error);
+        debug("Error loading bots:", error);
         if (this.retryCount < this.maxRetries) {
           this.retryCount++;
-          console.log(
-            `Retrying bot load (${this.retryCount}/${this.maxRetries})...`
-          );
+          debug(`Retrying bot load (${this.retryCount}/${this.maxRetries})...`);
           await new Promise((resolve) =>
             setTimeout(resolve, 1000 * this.retryCount)
           );
           return this.loadBots();
         }
         // Fallback to window.availableBots if all retries fail
+        debug("Using fallback bots data from window.availableBots");
         this.availableBots =
           window.availableBots?.[0]?.sort((a, b) =>
             a.name.localeCompare(b.name)
           ) || [];
+        debug("Fallback bots loaded:", this.availableBots.length, "bots");
       }
     }
 
     loadFromCache() {
       try {
         const cached = localStorage.getItem(CONFIG.cache.key);
-        if (!cached) return null;
+        if (!cached) {
+          debug("No cached bots data found");
+          return null;
+        }
 
         const { data, timestamp } = JSON.parse(cached);
         if (Date.now() - timestamp > CONFIG.cache.expiry) {
+          debug("Cached bots data expired, removing from cache");
           localStorage.removeItem(CONFIG.cache.key);
           return null;
         }
 
+        debug("Loaded bots from cache, age:", Date.now() - timestamp, "ms");
         return data;
       } catch (error) {
         console.error("Error loading from cache:", error);
+        debug("Error loading from cache:", error);
         return null;
       }
     }
@@ -143,8 +172,10 @@
             timestamp: Date.now(),
           })
         );
+        debug("Saved bots data to cache");
       } catch (error) {
         console.error("Error saving to cache:", error);
+        debug("Error saving to cache:", error);
       }
     }
 
@@ -172,6 +203,7 @@
       img.style =
         "width: 24px; height: 24px; margin-right: 8px; border-radius: 50%;";
       img.onerror = () => {
+        debug("Failed to load champion icon for:", bot.name, "using default");
         img.src = "/lol-game-data/assets/v1/champion-icons/-1.png"; // Default icon
       };
 
@@ -192,6 +224,7 @@
     }
 
     createBotSelect() {
+      debug("Creating bot selection dropdown");
       const dropdown = this.createDropdown();
       dropdown.id = CONFIG.selectors.botSelect;
 
@@ -204,10 +237,16 @@
       });
 
       dropdown.appendChild(fragment);
+      debug(
+        "Bot selection dropdown created with",
+        this.availableBots.length,
+        "options"
+      );
       return dropdown;
     }
 
     createDifficultySelect() {
+      debug("Creating difficulty selection dropdown");
       const dropdown = this.createDropdown();
       const fragment = document.createDocumentFragment();
 
@@ -219,35 +258,47 @@
       });
 
       dropdown.appendChild(fragment);
+      debug(
+        "Difficulty selection dropdown created with",
+        CONFIG.difficulties.length,
+        "options"
+      );
       return dropdown;
     }
 
     async addBot(teamId, championId, difficulty, button) {
-      if (!button) return;
+      if (!button) {
+        debug("No button provided for addBot");
+        return;
+      }
 
       const originalText = button.textContent;
       button.textContent = "Adding...";
       button.setAttribute("disabled", "true");
 
+      const botData = {
+        botDifficulty:
+          difficulty ||
+          CONFIG.difficulties[
+            Math.floor(Math.random() * CONFIG.difficulties.length)
+          ].id,
+        championId:
+          championId ||
+          this.availableBots[
+            Math.floor(Math.random() * this.availableBots.length)
+          ].id,
+        teamId: teamId.toString(),
+        position: "MIDDLE",
+        botUuid: crypto.randomUUID(),
+      };
+
+      debug("Adding bot with data:", botData);
+
       try {
         const response = await fetch(CONFIG.api.addBot, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            botDifficulty:
-              difficulty ||
-              CONFIG.difficulties[
-                Math.floor(Math.random() * CONFIG.difficulties.length)
-              ].id,
-            championId:
-              championId ||
-              this.availableBots[
-                Math.floor(Math.random() * this.availableBots.length)
-              ].id,
-            teamId: teamId.toString(),
-            position: "MIDDLE",
-            botUuid: crypto.randomUUID(),
-          }),
+          body: JSON.stringify(botData),
         });
 
         if (!response.ok) {
@@ -255,10 +306,12 @@
           throw error;
         }
 
+        debug("Bot added successfully");
         button.style.backgroundColor = "#28a745";
         button.textContent = "Added!";
       } catch (error) {
         console.error("Error adding bot:", error);
+        debug("Error adding bot:", error);
         button.style.backgroundColor = "#dc3545";
         button.textContent = "Failed!";
       } finally {
@@ -271,13 +324,20 @@
     }
 
     createDropdowns() {
-      if (document.getElementById(CONFIG.selectors.botSelect)) return;
+      if (document.getElementById(CONFIG.selectors.botSelect)) {
+        debug("Dropdowns already exist, skipping creation");
+        return;
+      }
 
       const pointEligibilityList = document.querySelector(
         CONFIG.selectors.eligibilityList
       );
-      if (!pointEligibilityList) return;
+      if (!pointEligibilityList) {
+        debug("Eligibility list not found, cannot create dropdowns");
+        return;
+      }
 
+      debug("Creating dropdowns");
       const fragment = document.createDocumentFragment();
       this.botSelect = this.createBotSelect();
       this.difficultySelect = this.createDifficultySelect();
@@ -293,11 +353,16 @@
       });
 
       pointEligibilityList.appendChild(fragment);
+      debug("Dropdowns added to DOM");
     }
 
     enableButton(button, teamId) {
-      if (button.hasAttribute("data-bot-enabled")) return;
+      if (button.hasAttribute("data-bot-enabled")) {
+        debug("Button already enabled, skipping");
+        return;
+      }
 
+      debug("Enabling button for team", teamId);
       button.removeAttribute("disabled");
       button.classList.remove("disabled");
       button.style.pointerEvents = "auto";
@@ -318,6 +383,13 @@
           selectedDiffOption?.value ||
           selectedDiffOption?.getAttribute("value");
 
+        debug(
+          "Button clicked - Champion:",
+          championId,
+          "Difficulty:",
+          difficulty
+        );
+
         this.addBot(
           teamId,
           championId ? parseInt(championId) : null,
@@ -327,6 +399,7 @@
       };
 
       button.setAttribute("data-bot-enabled", "true");
+      debug("Button enabled successfully");
     }
 
     enableAramBots() {
@@ -334,23 +407,30 @@
         document.querySelectorAll(CONFIG.selectors.botButton)
       ).filter((button) => button.textContent.trim() === "Add Bot");
 
+      debug("Found", disabledBotButtons.length, "disabled bot buttons");
+
       if (disabledBotButtons.length > 0) {
         this.createDropdowns();
 
-        disabledBotButtons.forEach((button) => {
+        disabledBotButtons.forEach((button, index) => {
           const teamContainer = button.closest(".custom-game-team");
           const teamId = teamContainer?.classList.contains(
             "custom-game-team-two"
           )
             ? 200
             : 100;
+          debug(`Enabling button ${index + 1} for team ${teamId}`);
           this.enableButton(button, teamId);
         });
       }
     }
 
     observeDOM() {
-      const debouncedEnable = debounce(() => this.enableAramBots(), 100);
+      debug("Setting up DOM observer");
+      const debouncedEnable = debounce(() => {
+        debug("DOM changed, checking for bot buttons");
+        this.enableAramBots();
+      }, 100);
 
       this.observer = new MutationObserver((mutations) => {
         if (
@@ -368,9 +448,13 @@
         childList: true,
         subtree: true,
       });
+      debug("DOM observer started");
     }
   }
 
   // Initialize when window loads
-  window.addEventListener("load", () => new AramBotEnabler());
+  window.addEventListener("load", () => {
+    debug("Window loaded, creating ARAM Bot Enabler instance");
+    new AramBotEnabler();
+  });
 })();
