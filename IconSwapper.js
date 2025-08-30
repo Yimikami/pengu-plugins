@@ -229,30 +229,52 @@
         debug(`Fetched ${icons.length} icons from API`);
         grid.innerHTML = "";
 
-        icons
+        const validIcons = [];
+        const iconPromises = icons
           .sort((a, b) => b.id - a.id)
-          .forEach((icon) => {
-            if (icon.id === -1) return;
+          .filter((icon) => icon.id !== -1)
+          .map((icon) => {
+            return new Promise((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                debug(`Icon ${icon.id} loaded successfully`);
+                validIcons.push({ ...icon, element: img });
+                resolve();
+              };
+              img.onerror = () => {
+                debug(`Icon ${icon.id} failed to load`);
+                resolve();
+              };
+              img.src = `/lol-game-data/assets/v1/profile-icons/${icon.id}.jpg`;
+              img.title = `ID: ${icon.id}`;
+              img.style.cssText =
+                "width: 80px; height: 80px; border-radius: 50%; cursor: pointer; transition: transform 0.2s;";
+              img.onmouseover = () => (img.style.transform = "scale(1.1)");
+              img.onmouseout = () => (img.style.transform = "scale(1)");
 
-            const img = document.createElement("img");
-            img.src = `/lol-game-data/assets/v1/profile-icons/${icon.id}.jpg`;
-            img.title = `ID: ${icon.id}`;
-            img.style.cssText =
-              "width: 80px; height: 80px; border-radius: 50%; cursor: pointer; transition: transform 0.2s;";
-            img.onmouseover = () => (img.style.transform = "scale(1.1)");
-            img.onmouseout = () => (img.style.transform = "scale(1)");
-
-            img.onclick = async () => {
-              debug(`Icon clicked: ID ${icon.id}`);
-              await window.DataStore.set(CONFIG.DATASTORE_KEY, icon.id);
-              window.Toast.success(`Icon changed to ID ${icon.id}!`);
-              await this.applyCustomIcon();
-              modal.remove();
-              debug("Icon selection completed");
-            };
-            grid.appendChild(img);
+              img.onclick = async () => {
+                debug(`Icon clicked: ID ${icon.id}`);
+                await window.DataStore.set(CONFIG.DATASTORE_KEY, icon.id);
+                window.Toast.success(`Icon changed to ID ${icon.id}!`);
+                await this.applyCustomIcon();
+                modal.remove();
+                debug("Icon selection completed");
+              };
+            });
           });
-        debug("Icon grid populated successfully");
+
+        await Promise.all(iconPromises);
+
+        validIcons.forEach((icon) => {
+          grid.appendChild(icon.element);
+        });
+
+        debug(`Icon grid populated with ${validIcons.length} valid icons`);
+
+        if (validIcons.length === 0) {
+          grid.innerHTML =
+            '<p style="color: #e63946;">No valid icons found. Please try again later.</p>';
+        }
       } catch (error) {
         grid.innerHTML =
           '<p style="color: #e63946;">Failed to load icons. Please try again later.</p>';
