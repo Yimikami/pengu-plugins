@@ -135,9 +135,10 @@
 <details>
 <summary>📖 Usage Guide</summary>
 
-1. Use Command Bar (Ctrl+K) and select desired icon
+1. Use Command Bar (Ctrl+K) and select Icon Swapper from the list
+2. Select the icon you want to use
+3. Enable debug mode in plugin settings for detailed logging
 
-2. Enable debug mode in plugin settings for detailed logging
 </details>
 
 ## ⚡ Quick Installation
