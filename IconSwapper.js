@@ -147,7 +147,7 @@
 
       const selectors = [
         `lol-regalia-hovercard-v2-element[summoner-id="${this.summonerId}"]`,
-        "lol-regalia-profile-v2-element",
+        `lol-regalia-profile-v2-element[summoner-id="${this.summonerId}"]`,
         `lol-regalia-parties-v2-element[summoner-id="${this.summonerId}"]`,
       ];
       const combinedSelector = selectors.join(", ");
