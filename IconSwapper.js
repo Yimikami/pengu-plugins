@@ -418,7 +418,7 @@
       };
 
       const content = document.createElement("div");
-      content.style.cssText = `width: 85%; max-width: 1000px; height: 75%; background: #1e2328; border: 1px solid #463714; border-radius: 12px; display: flex; flex-direction: column; padding: 0; box-shadow: 0 10px 25px rgba(0,0,0,0.3);`;
+      content.style.cssText = `width: 85%; max-width: 1000px; height: 75%; background: #1e2328; border: 1px solid #463714; display: flex; flex-direction: column; padding: 0; box-shadow: 0 10px 25px rgba(0,0,0,0.3);`;
 
       content.innerHTML = `
         <style>

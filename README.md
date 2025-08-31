@@ -120,7 +120,7 @@
 
 - 🚀 Instantly creates solo/duo ranked lobby when pressing play button
 
-### 🎭 Icon Swapper (v0.0.2)
+### 🎭 Icon Swapper (v0.1.0)
 
 > Change your summoner icon to any available icon from Community Dragon!
 
@@ -131,7 +131,8 @@
 - 💾 Saves selected icon to DataStore for persistence
 - ↩️ Revert button to restore original icon
 - ⌨️ Command Bar integration for quick access
-- 📂 Upload custom icons for personal use
+- 📂 Upload custom icons for personal use locally or via URL
+- 📂 View your collection of custom icons
 
 <details>
 <summary>📖 Usage Guide</summary>
