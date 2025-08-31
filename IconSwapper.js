@@ -553,6 +553,7 @@
               img.onclick = async () => {
                 debug(`Icon clicked: ID ${icon.id}`);
                 await window.DataStore.set(CONFIG.DATASTORE_KEY, icon.id);
+                await window.DataStore.set(CONFIG.CUSTOM_ICON_KEY, null);
                 window.Toast.success(`Icon changed to ID ${icon.id}!`);
                 await this.applyCustomIcon();
                 modal.remove();
