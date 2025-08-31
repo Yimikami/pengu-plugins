@@ -2,7 +2,7 @@
  * @name         IconSwapper
  * @author       Yimikami
  * @description  Allows changing your summoner icon to any icon and uploading local icons for custom use clientside.
- * @version      0.0.2
+ * @version      0.1.0
  */
 
 (() => {
@@ -51,6 +51,81 @@
     }
 
     return { valid: true };
+  }
+
+  function validateImageUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      const validProtocols = ["http:", "https:"];
+
+      if (!validProtocols.includes(urlObj.protocol)) {
+        return {
+          valid: false,
+          error: "URL must use HTTP or HTTPS protocol",
+        };
+      }
+
+      const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+      const pathname = urlObj.pathname.toLowerCase();
+      const hasImageExtension = imageExtensions.some((ext) =>
+        pathname.endsWith(ext)
+      );
+
+      return { valid: true };
+    } catch (error) {
+      return {
+        valid: false,
+        error: "Invalid URL format",
+      };
+    }
+  }
+
+  function loadImageFromUrl(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+
+        const maxWidth = 256;
+        const maxHeight = 256;
+
+        let { width, height } = img;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        resolve({
+          dataUrl,
+          width,
+          height,
+          originalUrl: url,
+        });
+      };
+
+      img.onerror = () => {
+        reject(new Error("Failed to load image from URL"));
+      };
+
+      img.src = url;
+    });
   }
 
   function processImageFile(
@@ -343,53 +418,137 @@
       };
 
       const content = document.createElement("div");
-      content.style.cssText = `width: 80%; max-width: 900px; height: 70%; background: #111; border: 1px solid #555; border-radius: 8px; display: flex; flex-direction: column; padding: 20px;`;
+      content.style.cssText = `width: 85%; max-width: 1000px; height: 75%; background: #1e2328; border: 1px solid #463714; border-radius: 12px; display: flex; flex-direction: column; padding: 0; box-shadow: 0 10px 25px rgba(0,0,0,0.3);`;
 
       content.innerHTML = `
-        <div style="display: flex; flex-direction: column; height: 100%; max-height: 100%;">
-          <div style="background: linear-gradient(135deg, #0a1428 0%, #1e2328 100%); border-bottom: 2px solid #785a28; padding: 20px 20px 15px 20px;">
-            <h1 style="color: #f0e6d2; text-align: center; margin: 0; font-size: 24px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">Summoner Icon Swapper</h1>
-          </div>
-          
-          <div style="display: flex; margin: 0; border-bottom: 1px solid #463714;">
-            <button id="tab-league" class="tab-button active" style="flex: 1; padding: 15px 20px; background: linear-gradient(135deg, #785a28 0%, #c89b3c 100%); color: #f0e6d2; border: none; cursor: pointer; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);">League Icons</button>
-            <button id="tab-custom" class="tab-button" style="flex: 1; padding: 15px 20px; background: linear-gradient(135deg, #1e2328 0%, #2d3748 100%); color: #cdbe91; border: none; cursor: pointer; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">Custom Icons</button>
-          </div>
-          
-          <div id="tab-league-content" class="tab-content" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
-            <div class="icon-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; padding: 20px; background: linear-gradient(135deg, #0a1428 0%, #1e2328 100%);">
-                <p style="color: #cdbe91; grid-column: 1 / -1; text-align: center; font-size: 16px; margin: 20px 0;">Loading icons...</p>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+
+          .tab-button {
+            transition: all 0.2s ease !important;
+          }
+
+          .icon-grid img {
+            transition: all 0.2s ease !important;
+          }
+
+          .icon-grid img:hover {
+            transform: scale(1.05) !important;
+          }
+
+          input[type="url"]:focus {
+            outline: none !important;
+            border-color: #c89b3c !important;
+          }
+
+          button:hover {
+            transform: translateY(-1px) !important;
+          }
+
+          #custom-icons-grid {
+            place-items: center !important;
+          }
+
+          @media (max-width: 800px) {
+            #custom-icons-grid {
+              grid-template-columns: repeat(auto-fill, minmax(100px, 100px)) !important;
+              gap: 12px !important;
+            }
+          }
+
+          #custom-icons-grid:has(:nth-child(1):nth-last-child(1)) {
+            justify-content: center !important;
+          }
+
+          #custom-icons-grid:has(:nth-child(2):nth-last-child(1)) {
+            justify-content: center !important;
+          }
+
+          #custom-icons-grid:has(:nth-child(-n+3)) {
+            justify-content: center !important;
+            align-content: start !important;
+          }
+        </style>
+
+        <div style="display: flex; height: 100%; max-height: 100%;">
+
+          <div style="width: 200px; background: #0f2027; border-right: 1px solid #463714; display: flex; flex-direction: column;">
+            <div style="padding: 16px; border-bottom: 1px solid #463714;">
+              <h1 style="color: #f0e6d2; margin: 0; font-size: 18px; font-weight: 600;">Icon Swapper</h1>
+            </div>
+            <div style="flex: 1; padding: 16px 0;">
+              <button id="tab-league" class="tab-button active" style="width: 100%; padding: 12px 20px; background: #c89b3c; color: #0f2027; border: none; cursor: pointer; font-weight: 500; font-size: 14px; margin-bottom: 8px; border-radius: 0;">League Icons</button>
+              <button id="tab-custom" class="tab-button" style="width: 100%; padding: 12px 20px; background: transparent; color: #cdbe91; border: none; cursor: pointer; font-size: 14px; border-radius: 0;">Custom Icons</button>
+            </div>
+            <div style="padding: 12px; border-top: 1px solid #463714;">
+              <button class="revert-button" style="width: 100%; padding: 10px 16px; background: #c8aa6e; color: #0f2027; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 13px;">Revert to Default</button>
+              <p style="color: #cdbe91; font-size: 11px; margin: 8px 0 0 0; line-height: 1.3; text-align: center;">Resets client</p>
             </div>
           </div>
+
+
+          <div style="flex: 1; display: flex; flex-direction: column;">
           
-          <div id="tab-custom-content" class="tab-content" style="flex: 1; display: none; flex-direction: column; min-height: 0; overflow: hidden;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; height: 100%; min-height: 0;">
-              <div style="background: linear-gradient(135deg, #1e2328 0%, #2d3748 100%); border: 1px solid #463714; border-radius: 8px; padding: 20px; display: flex; flex-direction: column;">
-                <h3 style="color: #f0e6d2; margin: 0 0 15px 0; font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Upload New Icon</h3>
-                <div style="margin-bottom: 15px;">
-                  <input type="file" id="custom-icon-upload" accept="image/jpeg,image/png,image/gif" style="display: none;">
-                  <button id="upload-button" style="padding: 10px 16px; background: linear-gradient(135deg, #785a28 0%, #c89b3c 100%); color: #f0e6d2; border: none; border-radius: 6px; cursor: pointer; margin-right: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">Choose File</button>
-                  <span id="file-name" style="color: #cdbe91; font-size: 12px; display: block; margin-top: 8px;">No file selected</span>
-                </div>
-                <div id="upload-preview" style="width: 100px; height: 100px; border: 2px solid #463714; border-radius: 50%; margin: 0 auto 15px auto; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0a1428 0%, #1e2328 100%); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
-                  <span style="color: #785a28; font-size: 12px; text-align: center;">Preview</span>
-                </div>
-                <button id="add-custom" style="padding: 12px 16px; background: linear-gradient(135deg, #1e8a1e 0%, #2d9d2d 100%); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3);" disabled>Add to Collection</button>
+            <div id="tab-league-content" class="tab-content" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+              <div class="icon-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 16px; padding: 24px; background: #1e2328;">
+                  <div style="grid-column: 1 / -1; text-align: center; margin: 40px 20px;">
+                    <div style="display: inline-block; width: 32px; height: 32px; border: 2px solid #c89b3c; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px;"></div>
+                    <p style="color: #cdbe91; font-size: 14px; margin: 0;">Loading League icons...</p>
+                  </div>
               </div>
-              
-              <div style="background: linear-gradient(135deg, #1e2328 0%, #2d3748 100%); border: 1px solid #463714; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; overflow: hidden;">
-                <h3 style="color: #f0e6d2; margin: 0 0 15px 0; font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Your Collection</h3>
-                <div id="custom-icons-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; padding-right: 10px;">
-                  <p style="color: #cdbe91; grid-column: 1 / -1; text-align: center; font-size: 14px; margin: 20px 0;">No custom icons yet.<br>Upload one to get started!</p>
+            </div>
+          
+            <div id="tab-custom-content" class="tab-content" style="flex: 1; display: none; overflow-y: auto; flex-direction: column;">
+              <div style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; padding: 24px; min-height: 100%;">
+
+                <div style="background: #1e2328; border: 1px solid #463714; border-radius: 8px; padding: 20px;">
+                  <h3 style="color: #f0e6d2; margin: 0 0 16px 0; font-size: 16px; font-weight: 500;">
+                    Add Custom Icon
+                  </h3>
+
+
+                  <div style="margin-bottom: 16px;">
+                    <input type="file" id="custom-icon-upload" accept="image/jpeg,image/png,image/gif" style="display: none;">
+                    <button id="upload-button" style="width: 100%; padding: 10px 16px; background: #c89b3c; color: #0f2027; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px; margin-bottom: 8px;">Choose File</button>
+                    <span id="file-name" style="color: #cdbe91; font-size: 12px; display: block;">No file selected</span>
+                  </div>
+
+
+                  <div style="text-align: center; margin: 16px 0; color: #785a28; font-size: 12px;">or</div>
+
+
+                  <div style="margin-bottom: 16px;">
+                    <input type="url" id="url-input" placeholder="Paste image URL here..." style="width: 100%; padding: 10px 12px; background: #0f2027; border: 1px solid #463714; border-radius: 6px; color: #f0e6d2; font-size: 14px; box-sizing: border-box; margin-bottom: 8px;">
+                    <span id="url-status" style="color: #cdbe91; font-size: 12px; display: block;"></span>
+                  </div>
+
+
+                  <div id="shared-preview" style="width: 120px; height: 120px; border: 1px solid #463714; border-radius: 50%; margin: 0 auto 16px auto; display: flex; align-items: center; justify-content: center; background: #0f2027;">
+                    <span style="color: #785a28; font-size: 12px; text-align: center;">Preview</span>
+                  </div>
+
+
+                  <button id="add-to-collection" style="width: 100%; padding: 12px 16px; background: #0596aa; color: #f0e6d2; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 14px;" disabled>Add to Collection</button>
+                </div>
+
+
+                <div style="background: #1e2328; border: 1px solid #463714; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; overflow: hidden;">
+                  <h3 style="color: #f0e6d2; margin: 0 0 16px 0; font-size: 16px; font-weight: 500;">
+                    Your Collection
+                  </h3>
+                  <div id="custom-icons-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 120px)); gap: 16px; padding: 16px; justify-content: center; align-items: start;">
+                    <div style="grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; min-height: 200px;"><div style="width: 64px; height: 64px; border: 2px dashed #463714; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;"><span style="font-size: 24px; color: #463714;">📁</span></div><p style="color: #cdbe91; text-align: center; font-size: 14px; margin: 0; line-height: 1.5;">No custom icons yet.<br>Upload a file or add an image URL to get started!</p></div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+        </div>
           
-          <div style="background: linear-gradient(135deg, #0a1428 0%, #1e2328 100%); border-top: 2px solid #785a28; padding: 15px 20px; text-align: center;">
-            <button class="revert-button" style="padding: 12px 24px; background: linear-gradient(135deg, #a42020 0%, #c42e2e 100%); color: #f0e6d2; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">Revert to Default</button>
-            <p style="color: #cdbe91; font-size: 11px; margin: 8px 0 0 0; opacity: 0.8;">This will reset the client to apply changes</p>
-          </div>
+
         </div>
       `;
 
@@ -397,7 +556,9 @@
       document.body.appendChild(modal);
       debug("Modal created and added to DOM");
 
-      content.querySelector(".revert-button").onclick = async () => {
+      const revertButton = content.querySelector(".revert-button");
+
+      revertButton.onclick = async () => {
         debug("Revert button clicked, resetting to default icon");
         await window.DataStore.set(CONFIG.DATASTORE_KEY, null);
         await window.DataStore.set(CONFIG.CUSTOM_ICON_KEY, null);
@@ -414,34 +575,26 @@
 
       tabLeague.onclick = () => {
         tabLeague.classList.add("active");
-        tabLeague.style.background =
-          "linear-gradient(135deg, #785a28 0%, #c89b3c 100%)";
-        tabLeague.style.color = "#f0e6d2";
-        tabLeague.style.fontWeight = "bold";
-        tabLeague.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.1)";
+        tabLeague.style.background = "#c89b3c";
+        tabLeague.style.color = "#0f2027";
+        tabLeague.style.fontWeight = "500";
         tabCustom.classList.remove("active");
-        tabCustom.style.background =
-          "linear-gradient(135deg, #1e2328 0%, #2d3748 100%)";
+        tabCustom.style.background = "transparent";
         tabCustom.style.color = "#cdbe91";
         tabCustom.style.fontWeight = "normal";
-        tabCustom.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.05)";
         tabLeagueContent.style.display = "flex";
         tabCustomContent.style.display = "none";
       };
 
       tabCustom.onclick = () => {
         tabCustom.classList.add("active");
-        tabCustom.style.background =
-          "linear-gradient(135deg, #785a28 0%, #c89b3c 100%)";
-        tabCustom.style.color = "#f0e6d2";
-        tabCustom.style.fontWeight = "bold";
-        tabCustom.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.1)";
+        tabCustom.style.background = "#c89b3c";
+        tabCustom.style.color = "#0f2027";
+        tabCustom.style.fontWeight = "500";
         tabLeague.classList.remove("active");
-        tabLeague.style.background =
-          "linear-gradient(135deg, #1e2328 0%, #2d3748 100%)";
+        tabLeague.style.background = "transparent";
         tabLeague.style.color = "#cdbe91";
         tabLeague.style.fontWeight = "normal";
-        tabLeague.style.boxShadow = "inset 0 1px 0 rgba(255,255,255,0.05)";
         tabCustomContent.style.display = "flex";
         tabLeagueContent.style.display = "none";
         this.loadCustomIcons();
@@ -450,11 +603,100 @@
       const fileInput = content.querySelector("#custom-icon-upload");
       const uploadButton = content.querySelector("#upload-button");
       const fileName = content.querySelector("#file-name");
-      const uploadPreview = content.querySelector("#upload-preview");
-      const addCustomButton = content.querySelector("#add-custom");
+      const urlInput = content.querySelector("#url-input");
+      const urlStatus = content.querySelector("#url-status");
+      const sharedPreview = content.querySelector("#shared-preview");
+      const addToCollectionButton = content.querySelector("#add-to-collection");
+
+      let currentData = null; // Can be file or URL data
+      let currentSource = null; // 'file' or 'url'
 
       uploadButton.onclick = () => {
         fileInput.click();
+      };
+
+      let urlTimeout;
+      urlInput.addEventListener("input", () => {
+        const url = urlInput.value.trim();
+
+        // Clear previous timeout
+        if (urlTimeout) clearTimeout(urlTimeout);
+
+        if (url === "") {
+          urlStatus.textContent = "";
+          resetPreview();
+          return;
+        }
+
+        const validation = validateImageUrl(url);
+        if (validation.valid) {
+          urlStatus.textContent = "Loading preview...";
+          urlStatus.style.color = "#cdbe91";
+
+          // Auto-load preview after 1 second of no typing
+          urlTimeout = setTimeout(async () => {
+            await loadUrlPreview(url);
+          }, 1000);
+        } else {
+          urlStatus.textContent = validation.error;
+          urlStatus.style.color = "#c8aa6e";
+          resetPreview();
+        }
+      });
+
+      async function loadUrlPreview(url) {
+        try {
+          sharedPreview.innerHTML =
+            '<div style="width: 20px; height: 20px; border: 2px solid #c89b3c; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>';
+
+          const imageData = await loadImageFromUrl(url);
+          currentData = imageData;
+          currentSource = "url";
+
+          sharedPreview.innerHTML = `<img src="${imageData.dataUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+          urlStatus.textContent = `Image loaded (${imageData.width}x${imageData.height})`;
+          urlStatus.style.color = "#0596aa";
+          addToCollectionButton.disabled = false;
+        } catch (error) {
+          sharedPreview.innerHTML =
+            '<span style="color: #c8aa6e; font-size: 12px; text-align: center;">Failed to load</span>';
+          urlStatus.textContent = "Failed to load image from URL";
+          urlStatus.style.color = "#c8aa6e";
+          resetPreview();
+        }
+      }
+
+      function resetPreview() {
+        currentData = null;
+        currentSource = null;
+        addToCollectionButton.disabled = true;
+        sharedPreview.innerHTML =
+          '<span style="color: #785a28; font-size: 12px; text-align: center;">Preview</span>';
+      }
+
+      addToCollectionButton.onclick = async () => {
+        if (!currentData || !currentSource) return;
+
+        debug("Adding custom icon from", currentSource);
+
+        let iconName;
+        if (currentSource === "url") {
+          const urlObj = new URL(currentData.originalUrl);
+          iconName = urlObj.pathname.split("/").pop() || "url-image";
+        } else {
+          iconName = currentData.name || "uploaded-image";
+        }
+
+        await this.addCustomIcon(iconName, currentData.dataUrl);
+        window.Toast.success("Custom icon added to collection!");
+
+        urlInput.value = "";
+        fileInput.value = "";
+        fileName.textContent = "No file selected";
+        urlStatus.textContent = "";
+        resetPreview();
+
+        this.loadCustomIcons();
       };
 
       fileInput.onchange = async (e) => {
@@ -467,36 +709,25 @@
             window.Toast.error(validation.error);
             fileInput.value = "";
             fileName.textContent = "No file selected";
+            resetPreview();
             return;
           }
 
-          fileName.textContent = `Processing ${file.name}...`;
-          addCustomButton.disabled = true;
+          fileName.textContent = file.name;
+
+          urlInput.value = "";
+          urlStatus.textContent = "";
 
           try {
+            sharedPreview.innerHTML =
+              '<div style="width: 20px; height: 20px; border: 2px solid #c89b3c; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>';
+
             const processedFile = await processImageFile(file, 256, 256, 0.8);
+            currentData = { ...processedFile, name: file.name };
+            currentSource = "file";
 
-            fileName.textContent = `${file.name} (${(
-              processedFile.processedSize /
-              (1024 * 1024)
-            ).toFixed(2)}MB)`;
-
-            uploadPreview.innerHTML = `<img src="${processedFile.dataUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
-
-            addCustomButton.disabled = false;
-            addCustomButton.onclick = async () => {
-              debug("Adding custom icon to list");
-              await this.addCustomIcon(file.name, processedFile.dataUrl);
-              window.Toast.success("Custom icon added to your collection!");
-
-              fileInput.value = "";
-              fileName.textContent = "No file selected";
-              uploadPreview.innerHTML =
-                '<span style="color: #785a28; font-size: 12px;">Preview</span>';
-              addCustomButton.disabled = true;
-
-              this.loadCustomIcons();
-            };
+            sharedPreview.innerHTML = `<img src="${processedFile.dataUrl}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`;
+            addToCollectionButton.disabled = false;
 
             debug("Custom icon processed successfully");
           } catch (error) {
@@ -504,8 +735,7 @@
             window.Toast.error("Failed to process image file");
             fileInput.value = "";
             fileName.textContent = "No file selected";
-            uploadPreview.innerHTML =
-              '<span style="color: #785a28; font-size: 12px;">Preview</span>';
+            resetPreview();
           }
         }
       };
@@ -537,17 +767,16 @@
               img.src = `/lol-game-data/assets/v1/profile-icons/${icon.id}.jpg`;
               img.title = `ID: ${icon.id}`;
               img.style.cssText =
-                "width: 90px; height: 90px; border-radius: 50%; cursor: pointer; transition: all 0.3s ease; border: 3px solid transparent; box-shadow: 0 4px 8px rgba(0,0,0,0.3);";
+                "width: 100px; height: 100px; border-radius: 50%; cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.3);";
               img.onmouseover = () => {
                 img.style.transform = "scale(1.05)";
                 img.style.borderColor = "#c89b3c";
-                img.style.boxShadow =
-                  "0 6px 12px rgba(0,0,0,0.4), 0 0 0 2px rgba(200,155,60,0.3)";
+                img.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
               };
               img.onmouseout = () => {
                 img.style.transform = "scale(1)";
                 img.style.borderColor = "transparent";
-                img.style.boxShadow = "0 4px 8px rgba(0,0,0,0.3)";
+                img.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
               };
 
               img.onclick = async () => {
@@ -564,15 +793,25 @@
 
         await Promise.all(iconPromises);
 
-        validIcons.forEach((icon) => {
+        grid.innerHTML = "";
+
+        validIcons.forEach((icon, index) => {
+          icon.element.style.opacity = "0";
+          icon.element.style.transform = "scale(0.8)";
+          icon.element.style.transition = "all 0.3s ease";
           grid.appendChild(icon.element);
+
+          setTimeout(() => {
+            icon.element.style.opacity = "1";
+            icon.element.style.transform = "scale(1)";
+          }, index * 20);
         });
 
         debug(`Icon grid populated with ${validIcons.length} valid icons`);
 
         if (validIcons.length === 0) {
           grid.innerHTML =
-            '<p style="color: #e63946;">No valid icons found. Please try again later.</p>';
+            '<div style="grid-column: 1 / -1; text-align: center; margin: 40px 20px;"><p style="color: #e63946; font-size: 16px; margin: 0;">No valid icons found. Please try again later.</p></div>';
         }
       } catch (error) {
         grid.innerHTML =
@@ -618,7 +857,7 @@
 
       if (customIcons.length === 0) {
         customIconsGrid.innerHTML =
-          '<p style="color: #888; grid-column: 1 / -1; text-align: center;">No custom icons yet. Upload one above!</p>';
+          '<div style="grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; min-height: 200px;"><div style="width: 64px; height: 64px; border: 2px dashed #463714; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 16px;"><span style="font-size: 24px; color: #463714;">📁</span></div><p style="color: #cdbe91; text-align: center; font-size: 14px; margin: 0; line-height: 1.5;">No custom icons yet.<br>Upload a file or add an image URL to get started!</p></div>';
         return;
       }
 
@@ -627,25 +866,24 @@
       customIcons.forEach((icon) => {
         const iconContainer = document.createElement("div");
         iconContainer.style.cssText =
-          "position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px;";
+          "position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 120px; height: auto;";
 
         const img = document.createElement("img");
         img.src = icon.dataUrl;
         img.title = icon.name;
         img.style.cssText =
-          "width: 90px; height: 90px; border-radius: 50%; cursor: pointer; transition: all 0.3s ease; border: 3px solid transparent; box-shadow: 0 4px 8px rgba(0,0,0,0.3);";
+          "width: 100px; height: 100px; border-radius: 50%; cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.3); object-fit: cover;";
 
         img.onmouseover = () => {
           img.style.transform = "scale(1.05)";
           img.style.borderColor = "#c89b3c";
-          img.style.boxShadow =
-            "0 6px 12px rgba(0,0,0,0.4), 0 0 0 2px rgba(200,155,60,0.3)";
+          img.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
         };
 
         img.onmouseout = () => {
           img.style.transform = "scale(1)";
           img.style.borderColor = "transparent";
-          img.style.boxShadow = "0 4px 8px rgba(0,0,0,0.3)";
+          img.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
         };
 
         img.onclick = async () => {
@@ -659,16 +897,16 @@
 
         const nameLabel = document.createElement("div");
         nameLabel.textContent =
-          icon.name.length > 12
-            ? icon.name.substring(0, 12) + "..."
+          icon.name.length > 15
+            ? icon.name.substring(0, 15) + "..."
             : icon.name;
         nameLabel.style.cssText =
-          "color: #f0e6d2; font-size: 12px; text-align: center; max-width: 90px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.5);";
+          "color: #f0e6d2; font-size: 11px; text-align: center; width: 120px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.5); line-height: 1.2;";
 
         const deleteButton = document.createElement("button");
         deleteButton.textContent = "×";
         deleteButton.style.cssText =
-          "position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: linear-gradient(135deg, #a42020 0%, #c42e2e 100%); color: #f0e6d2; border: 2px solid #0a1428; border-radius: 50%; cursor: pointer; font-size: 16px; font-weight: bold; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s ease;";
+          "position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; background: #c8aa6e; color: #0f2027; border: 2px solid #0f2027; border-radius: 50%; cursor: pointer; font-size: 16px; font-weight: bold; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3); transition: all 0.2s ease;";
 
         iconContainer.onmouseenter = () => {
           deleteButton.style.display = "block";
