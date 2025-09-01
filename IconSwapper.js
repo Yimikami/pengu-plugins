@@ -444,6 +444,16 @@
             border-color: #c89b3c !important;
           }
 
+          input[type="text"]:focus {
+            outline: none !important;
+            border-color: #c89b3c !important;
+          }
+
+          #clear-search:hover {
+            background: #463714 !important;
+            color: #c89b3c !important;
+          }
+
           button:hover {
             transform: translateY(-1px) !important;
           }
@@ -493,6 +503,13 @@
           <div style="flex: 1; display: flex; flex-direction: column;">
           
             <div id="tab-league-content" class="tab-content" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden;">
+              <div style="padding: 16px 24px 0 24px; background: #1e2328; border-bottom: 1px solid #463714;">
+                <div style="position: relative; max-width: 400px;">
+                  <input type="text" id="icon-search" placeholder="Search by icon ID..." style="width: 100%; padding: 10px 36px 10px 12px; background: #0f2027; border: 1px solid #463714; border-radius: 6px; color: #f0e6d2; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s ease;">
+                  <button id="clear-search" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #785a28; cursor: pointer; font-size: 16px; width: 24px; height: 24px; display: none; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.2s ease;">×</button>
+                </div>
+                <p id="search-results-info" style="color: #cdbe91; font-size: 12px; margin: 8px 0 0 0; min-height: 16px;"></p>
+              </div>
               <div class="icon-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 16px; padding: 24px; background: #1e2328;">
                   <div style="grid-column: 1 / -1; text-align: center; margin: 40px 20px;">
                     <div style="display: inline-block; width: 32px; height: 32px; border: 2px solid #c89b3c; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px;"></div>
@@ -741,6 +758,87 @@
       };
 
       const grid = content.querySelector(".icon-grid");
+      const searchInput = content.querySelector("#icon-search");
+      const clearButton = content.querySelector("#clear-search");
+      const searchInfo = content.querySelector("#search-results-info");
+      
+      let allValidIcons = []; // Store all loaded icons for searching
+      
+      // Search functionality
+      const self = this; // Store reference to maintain context
+      function filterIcons(searchTerm) {
+        const filtered = allValidIcons.filter(icon => 
+          icon.id.toString().includes(searchTerm.toLowerCase())
+        );
+        
+        displayIcons(filtered);
+        updateSearchInfo(searchTerm, filtered.length, allValidIcons.length);
+      }
+      
+      function displayIcons(iconsToShow) {
+        grid.innerHTML = "";
+        
+        if (iconsToShow.length === 0) {
+          grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; margin: 40px 20px;"><p style="color: #cdbe91; font-size: 14px; margin: 0;">No icons found matching your search.</p></div>';
+          return;
+        }
+        
+        iconsToShow.forEach((icon, index) => {
+          const img = icon.element.cloneNode(true);
+          img.style.opacity = "0";
+          img.style.transform = "scale(0.8)";
+          img.style.transition = "all 0.3s ease";
+          
+          // Re-attach the click handler
+          img.onclick = async () => {
+            debug(`Icon clicked: ID ${icon.id}`);
+            await window.DataStore.set(CONFIG.DATASTORE_KEY, icon.id);
+            await window.DataStore.set(CONFIG.CUSTOM_ICON_KEY, null);
+            window.Toast.success(`Icon changed to ID ${icon.id}!`);
+            await self.applyCustomIcon();
+            modal.remove();
+            debug("Icon selection completed");
+          };
+          
+          grid.appendChild(img);
+          
+          setTimeout(() => {
+            img.style.opacity = "1";
+            img.style.transform = "scale(1)";
+          }, index * 20);
+        });
+      }
+      
+      function updateSearchInfo(searchTerm, filteredCount, totalCount) {
+        if (searchTerm.trim() === "") {
+          searchInfo.textContent = `${totalCount} icons`;
+        } else {
+          searchInfo.textContent = `${filteredCount} of ${totalCount} icons found`;
+        }
+      }
+      
+      // Search input event listeners
+      searchInput.addEventListener("input", (e) => {
+        const searchTerm = e.target.value.trim();
+        
+        if (searchTerm === "") {
+          clearButton.style.display = "none";
+          displayIcons(allValidIcons);
+          updateSearchInfo("", allValidIcons.length, allValidIcons.length);
+        } else {
+          clearButton.style.display = "flex";
+          filterIcons(searchTerm);
+        }
+      });
+      
+      clearButton.addEventListener("click", () => {
+        searchInput.value = "";
+        clearButton.style.display = "none";
+        displayIcons(allValidIcons);
+        updateSearchInfo("", allValidIcons.length, allValidIcons.length);
+        searchInput.focus();
+      });
+      
       try {
         debug("Fetching icons from API");
         const response = await fetch(CONFIG.API_URL);
@@ -793,19 +891,9 @@
 
         await Promise.all(iconPromises);
 
-        grid.innerHTML = "";
-
-        validIcons.forEach((icon, index) => {
-          icon.element.style.opacity = "0";
-          icon.element.style.transform = "scale(0.8)";
-          icon.element.style.transition = "all 0.3s ease";
-          grid.appendChild(icon.element);
-
-          setTimeout(() => {
-            icon.element.style.opacity = "1";
-            icon.element.style.transform = "scale(1)";
-          }, index * 20);
-        });
+        allValidIcons = validIcons.slice(); // Store all valid icons for searching
+        displayIcons(allValidIcons);
+        updateSearchInfo("", allValidIcons.length, allValidIcons.length);
 
         debug(`Icon grid populated with ${validIcons.length} valid icons`);
 
