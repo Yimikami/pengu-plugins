@@ -51,7 +51,7 @@
    - Enable or disable automatic item sets
    </details>
 
-### 🤖 ARAM Bot Enabler (v0.0.1)
+### 🤖 ARAM Bot Enabler (v0.0.1) [Probably not working]
 
 > Add bots to your ARAM custom games!
 
@@ -144,6 +144,27 @@
 
 </details>
 
+### 🏆 Force Badge (v0.0.1)
+
+> Automatically display the "Game Pass" rewards badge on all champions and owned skins!
+
+**Key Features:**
+
+- ✨ Shows rewards badge on all champions in Collection/Mastery view
+- 🎨 Automatically adds badge to owned skins
+
+<details>
+<summary>📖 Usage Guide</summary>
+
+1. Install the plugin and restart your client
+2. The badges will automatically appear:
+   - **Champion Collection**: All champions show the rewards badge
+   - **Champion Select**: All selectable champions display the badge
+   - **Skin Carousel**: Owned skins show the rewards flag
+3. No configuration needed - it works automatically!
+
+</details>
+
 ## ⚡ Quick Installation
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
@@ -151,12 +172,12 @@
    ```
    📂 Pengu Loader
    └── 📂 plugins
-       ├── 📄 AramBotEnabler.js
        ├── 📄 ProfileWinLose.js
        ├── 📄 MassReport.js
        ├── 📄 InstantRankedLobby.js
        ├── 📄 RunePlugin.js
-       └── 📄 IconSwapper.js
+       ├── 📄 IconSwapper.js
+       └── 📄 ForceBadge.js
    ```
 3. Restart your League client
 
