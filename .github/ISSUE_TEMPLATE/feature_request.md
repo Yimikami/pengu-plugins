@@ -30,9 +30,9 @@ assignees: ""
 
 <!-- Which plugin(s) would this feature be for? -->
 
-- [ ] ARAM Bot Enabler
 - [ ] Profile Win/Loss Display
 - [ ] Mass Report Plugin
 - [ ] Icon Swapper
 - [ ] Instant Ranked Lobby
 - [ ] Rune Plugin
+- [ ] ForceBadge

@@ -1,7 +1,7 @@
 /**
  * @name ARAMBotEnabler
  * @author Yimikami
- * @description Enables adding bots in ARAM custom games
+ * @description Enables adding bots in ARAM custom games [Probably not working]
  * @link https://github.com/Yimikami/pengu-plugins/
  * @version 0.0.1
  */
