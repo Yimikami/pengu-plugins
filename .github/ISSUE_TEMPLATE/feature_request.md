@@ -36,3 +36,4 @@ assignees: ""
 - [ ] Instant Ranked Lobby
 - [ ] Rune Plugin
 - [ ] ForceBadge
+- [ ] Champion Dismisser

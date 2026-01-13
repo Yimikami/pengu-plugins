@@ -165,6 +165,27 @@
 
 </details>
 
+### 🚫 Champion Dismisser (v0.0.1)
+
+> Prevent yourself from picking specific champions by blacklisting them!
+
+**Key Features:**
+
+- 🚫 Visually disable blacklisted champions in Champion Select
+- ⚙️ Easy-to-use configuration modal with search
+- 💾 Persistent blacklist storage
+- 🗑️ "Clear All" button to reset blacklist
+
+<details>
+<summary>📖 Usage Guide</summary>
+
+1. Open Command Bar (`Ctrl + K`)
+2. Select **"Configure Blacklist"**
+3. Search and click champions to toggle their blacklist status
+4. In Champion Select, blacklisted champions will be greyed out and unselectable
+
+</details>
+
 ## ⚡ Quick Installation
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
