@@ -1,242 +1,226 @@
-# Pengu Loader Plugins 🐧
+<div align="center">
 
-[![Pengu Loader](https://img.shields.io/badge/Pengu%20Loader-Compatible-blue)](https://github.com/PenguLoader/PenguLoader)
-[![League of Legends](https://img.shields.io/badge/League%20of%20Legends-Plugins-red)](https://www.leagueoflegends.com/)
+# ⚡ Pengu Plugins
 
-> A curated collection of powerful plugins to enhance your League of Legends experience! 🎮✨
+**A premium collection of plugins for League of Legends via [Pengu Loader](https://github.com/PenguLoader/PenguLoader)**
 
-## 📚 Table of Contents
+[![Pengu Loader](https://img.shields.io/badge/Pengu_Loader-Compatible-0596aa?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZmZmIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnoiLz48L3N2Zz4=)](https://github.com/PenguLoader/PenguLoader)
+[![License](https://img.shields.io/badge/License-MIT-c8aa6e?style=for-the-badge)](LICENSE)
 
-- [🔌 Available Plugins](#-available-plugins)
-- [⚡ Quick Installation](#-quick-installation)
-- [🆘 Support](#-support)
+</div>
 
-## 🔌 Available Plugins
+---
 
-### 🔄 Rune Plugin (v0.0.4)
+## 📦 Plugins
 
-> Automatically fetches and applies optimal runes and item sets from U.GG or Lolalytics during champion select!
+| Plugin | Version | Description |
+|--------|---------|-------------|
+| [SoloQ Machine](#-soloq-machine) | `0.0.1` | Full ranked autopilot — queue, accept, honor, play again |
+| [Rune Plugin](#-rune-plugin) | `0.0.4` | Auto runes & item sets from U.GG / Lolalytics |
+| [Icon Swapper](#-icon-swapper) | `0.1.0` | Change your summoner icon to anything (client-side) |
+| [Profile Win/Loss](#-profile-winloss) | `0.0.3` | Win/loss stats on any profile page |
+| [Champion Dismisser](#-champion-dismisser) | `0.0.1` | Blacklist champions from champ select |
+| [Mass Report](#-mass-report) | `0.0.3` | Batch reporting from match history |
+| [Force Badge](#-force-badge) | `0.0.1` | Game Pass badge on all champions & skins |
+| [ARAM Bot Enabler](#-aram-bot-enabler) | `0.0.1` | Add bots to ARAM custom games |
+| [Instant Ranked Lobby](#-instant-ranked-lobby) | `0.0.1` | One-click ranked lobby (standalone) |
 
-**Key Features:**
+---
 
-- 🔄 Auto-fetches optimal runes from U.GG or Lolalytics
+## 🤖 SoloQ Machine
 
-- 📦 Auto-creates optimal item sets from Lolalytics
-- 🔄 Configurable rune provider (U.GG/Lolalytics)
-- ⚙️ Toggle item sets feature on/off
-- 🎯 Role-specific rune and item configurations
-- 📊 Uses latest patch data automatically
-- 📝 If no position provided, the plugin will analyze your champion pick and find most popular position for the champion and apply runes accordingly
-- ⚔️ Supports Arena mode
+> Your ranked autopilot. Automates the entire ranked flow so you can focus on the game.
 
-<details>
-<summary>📖 Usage Guide</summary>
+**What it does:**
 
-1. Enter champion select
-2. Select your champion
-3. Runes will automatically be applied based on:
-   - Your assigned position
-   - Champion pick
-   - Latest data from your chosen provider
-4. Item sets will be created with:
-   - Most popular core items
-   - Most popular full build
-   - Highest winrate core items
-   - Highest winrate full build
-   - Situational items
-5. Configure your preferences in plugin settings:
-   - Open client settings
-   - Navigate to the Rune Plugin section
-   - Select either U.GG or Lolalytics as your provider
-   - Enable or disable automatic item sets
-   </details>
-
-### 🤖 ARAM Bot Enabler (v0.0.1) [Probably not working]
-
-> Add bots to your ARAM custom games!
-
-**Key Features:**
-
-- ✅ Add bots to either team in ARAM custom games
-- ✅ Select specific champions for bots or choose random
-- ✅ Choose bot difficulty (Intro, Beginner, Intermediate)
+| Feature | Details |
+|---------|---------|
+| **Auto Accept** | Accepts match with configurable delay |
+| **Auto Matchmaking** | Starts queue automatically when entering lobby |
+| **Wait for Invites** | Holds queue until pending invitations are answered |
+| **Min. Lobby Members** | Requires N players (1–5) before starting queue |
+| **Auto Honor** | Honors a random ally after game |
+| **Auto Play Again** | Returns to lobby with configurable delay |
+| **Instant Ranked Lobby** | Play button → ranked Solo/Duo lobby |
+| **UI Cleanup** | Hides distracting elements (nav menus, social, notifications) |
 
 <details>
-<summary>📖 Usage Guide</summary>
+<summary><b>⚙️ Configuration</b></summary>
 
-1. Create an ARAM custom game
-2. Look for the "Add Bot" buttons that are now enabled
-3. (Optional) Select a specific champion and difficulty from the dropdowns
-4. Click "Add Bot" to add the bot to your team
-</details>
+Click the settings gear icon (bottom-right corner of the client) to configure:
 
-### 📊 Profile Win/Loss Display (v0.0.3)
-
-> Get detailed statistics right on the profile page!
-
-**Key Features:**
-
-- 📈 Comprehensive win/loss statistics
-- 🔍 Filter by queue type (All, Normal, Ranked, ARAM)
-- 🗓️ Season 15 specific statistics
-- ⚙️ Customizable game count (1-200)
-
-<details>
-<summary>📖 Usage Guide</summary>
-
-1. Open any summoner profile
-2. View statistics automatically below summoner name
-3. Customize via settings:
-   - Games to analyze (1-200)
-   - Queue Type filter
-   - Season 15 filter
-   </details>
-
-### ⚖️ Mass Report Plugin (v0.0.3)
-
-> Efficient reporting system with whitelist protection
-
-**Key Features:**
-
-- 🎯 Mass reporting from match history
-- 👥 Team-specific reporting options
-- ⭐ Whitelist system for player protection
-- 📝 Detailed feedback on report status
-
-<details>
-<summary>📖 Usage Guide</summary>
-
-1. Open any match in history
-2. Enter the Game ID
-3. Click "Report All"
-4. Monitor toast notifications
-</details>
-
-### ⚡ Instant Ranked Lobby (v0.0.1)
-
-> Quick access to ranked games!
-
-**Feature:**
-
-- 🚀 Instantly creates solo/duo ranked lobby when pressing play button
-
-### 🎭 Icon Swapper (v0.1.0)
-
-> Change your summoner icon to any available icon from Community Dragon!
-
-**Key Features:**
-
-- 🎯 Fetches all available summoner icons from Community Dragon API
-- 🔄 Changes icons in hover cards, profiles, and party elements
-- 💾 Saves selected icon to DataStore for persistence
-- ↩️ Revert button to restore original icon
-- ⌨️ Command Bar integration for quick access
-- 📂 Upload custom icons for personal use locally or via URL
-- 📂 View your collection of custom icons
-
-<details>
-<summary>📖 Usage Guide</summary>
-
-1. Use Command Bar (Ctrl+K) and select Icon Swapper from the list
-2. Select the icon you want to use
-3. Upload custom icons for personal use (Optional)
-4. Enable debug mode in plugin settings for detailed logging
+- **Queue Automation** — Auto Accept, Auto Matchmaking, delays, lobby conditions
+- **Post-Game** — Auto Honor, Auto Play Again, play-again delay
+- **Lobby** — Instant Ranked Lobby toggle
+- **UI** — Hide Distracting Elements toggle
+- **Debug** — Debug Logging toggle
 
 </details>
 
-### 🏆 Force Badge (v0.0.1)
+---
 
-> Automatically display the "Game Pass" rewards badge on all champions and owned skins!
+## 🔄 Rune Plugin
 
-**Key Features:**
+> Automatically fetches and applies optimal runes and item sets during champion select.
 
-- ✨ Shows rewards badge on all champions in Collection/Mastery view
-- 🎨 Automatically adds badge to owned skins
+- 🎯 Fetches from **U.GG** or **Lolalytics** (configurable)
+- 📦 Auto-creates item sets (most popular, highest winrate, situational)
+- 🗺️ Role-specific configurations with automatic position detection
+- ⚔️ Arena mode support
+- ⚙️ Settings in client settings panel
 
 <details>
-<summary>📖 Usage Guide</summary>
+<summary><b>📖 Usage</b></summary>
 
-1. Install the plugin and restart your client
-2. The badges will automatically appear:
-   - **Champion Collection**: All champions show the rewards badge
-   - **Champion Select**: All selectable champions display the badge
-   - **Skin Carousel**: Owned skins show the rewards flag
-3. No configuration needed - it works automatically!
+1. Enter champion select and pick your champion
+2. Runes are auto-applied based on position + champion + latest patch
+3. Item sets are created with popular/winrate builds
+4. Configure provider and item sets in **Settings → Rune Plugin**
 
 </details>
 
-### 🚫 Champion Dismisser (v0.0.1)
+---
 
-> Prevent yourself from picking specific champions by blacklisting them!
+## 🎭 Icon Swapper
 
-**Key Features:**
+> Change your summoner icon to any icon from Community Dragon or upload your own.
 
-- 🚫 Visually disable blacklisted champions in Champion Select
-- ⚙️ Easy-to-use configuration modal with search
-- 💾 Persistent blacklist storage
-- 🗑️ "Clear All" button to reset blacklist
+- 🌐 Browse all League icons from Community Dragon API
+- 📂 Upload custom icons (local file or URL)
+- 🔍 Search icons by ID
+- 💾 Persistent via DataStore
+- ↩️ One-click revert to default
 
 <details>
-<summary>📖 Usage Guide</summary>
+<summary><b>📖 Usage</b></summary>
 
-1. Open Command Bar (`Ctrl + K`)
-2. Select **"Configure Blacklist"**
-3. Search and click champions to toggle their blacklist status
-4. In Champion Select, blacklisted champions will be greyed out and unselectable
+1. Press `Ctrl+K` → select **Change Summoner Icon**
+2. Browse or search League icons, or switch to Custom Icons tab
+3. Upload local files or paste image URLs
+4. Click any icon to apply
 
 </details>
 
-## ⚡ Quick Installation
+---
+
+## 📊 Profile Win/Loss
+
+> Win/loss statistics displayed directly on summoner profiles.
+
+- 📈 Win rate, W/L count, and KDA stats
+- 🔍 Filter by queue type (Ranked, Normal, ARAM, Swiftplay)
+- 🗓️ Season 15 filter
+- ⚙️ Configurable game count (1–200)
+
+<details>
+<summary><b>📖 Usage</b></summary>
+
+1. Open any summoner profile — stats appear automatically
+2. Configure in **Settings → Profile Win/Loss**:
+   - Games to analyze, Queue Type, Season filter, KDA display
+
+</details>
+
+---
+
+## 🚫 Champion Dismisser
+
+> Blacklist champions to prevent yourself from picking them.
+
+- 🚫 Greyed-out & unclickable in champion select
+- 🔍 Searchable configuration modal
+- 💾 Persistent blacklist via DataStore
+- 🗑️ Clear All button
+
+<details>
+<summary><b>📖 Usage</b></summary>
+
+1. Press `Ctrl+K` → select **Configure Blacklist**
+2. Search and click champions to toggle blacklist
+3. Blacklisted champions appear greyed out in champ select
+
+</details>
+
+---
+
+## ⚖️ Mass Report
+
+> Batch reporting from match history with whitelist protection.
+
+- 🎯 Report all, enemy-only, or ally-only
+- ⭐ Whitelist system to protect players
+- 📝 Toast notifications for each report
+- ⚙️ Settings in client settings panel
+
+<details>
+<summary><b>📖 Usage</b></summary>
+
+1. Open a match in history → enter Game ID
+2. Select target (All / Enemy / Ally)
+3. Click **Report**
+
+</details>
+
+---
+
+## 🏆 Force Badge
+
+> Shows the Game Pass rewards badge on all champions and skins.
+
+- ✨ Badge on all champions in Collection and Champion Select
+- 🎨 Reward flag on owned skins
+- Zero configuration — works automatically
+
+---
+
+## 🤖 ARAM Bot Enabler
+
+> Add bots to ARAM custom games. *(May not be working)*
+
+- Add bots to either team
+- Choose champion and difficulty (Intro / Beginner / Intermediate)
+
+---
+
+## ⚡ Instant Ranked Lobby
+
+> Standalone version — instantly creates a ranked Solo/Duo lobby when pressing Play.
+
+> **Note:** This feature is already included in [SoloQ Machine](#-soloq-machine). Use this only if you want the lobby shortcut without the full suite.
+
+---
+
+## 🚀 Installation
+
+```
+📂 Pengu Loader/
+└── 📂 plugins/
+    ├── 📄 SoloQMachine.js
+    ├── 📄 RunePlugin.js
+    ├── 📄 IconSwapper.js
+    ├── 📄 ProfileWinLose.js
+    ├── 📄 ChampionDismisser.js
+    ├── 📄 MassReport.js
+    ├── 📄 ForceBadge.js
+    └── 📄 AramBotEnabler.js
+```
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
-2. Copy plugins to your Pengu Loader directory:
-   ```
-   📂 Pengu Loader
-   └── 📂 plugins
-       ├── 📄 ProfileWinLose.js
-       ├── 📄 MassReport.js
-       ├── 📄 InstantRankedLobby.js
-       ├── 📄 RunePlugin.js
-       ├── 📄 IconSwapper.js
-       └── 📄 ForceBadge.js
-   ```
-3. Restart your League client
+2. Copy desired plugin files to your plugins directory
+3. Restart the League client
 
-## 🆘 Support
+---
 
-**Having issues?**
+## 🐛 Troubleshooting
 
-1. ✅ Verify your Pengu Loader is up to date
-2. 🔄 Try restarting the League client
-3. 🐛 Report issues:
-   - Create a [GitHub Issue](https://github.com/Yimikami/pengu-plugins/issues) (preferred)
-   - Email: [hi@yimikami.me](mailto:hi@yimikami.me)
+1. Ensure Pengu Loader is up to date
+2. Restart the League client
+3. Enable **Debug Logging** in plugin settings for console output
+4. Open DevTools with `Ctrl + Shift + I` to view logs
 
-> For bug reports, please include:
->
-> - Plugin name and version
-> - Steps to reproduce the issue
-> - Expected vs actual behavior
-> - Any error messages you received
-> - Console logs (see below)
+**Report issues:** [GitHub Issues](https://github.com/Yimikami/pengu-plugins/issues) · [hi@yimikami.me](mailto:hi@yimikami.me)
 
-### 🔍 Getting Console Logs
-
-Most plugins include a debug mode that can help diagnose issues:
-
-1. Enable debug mode in the plugin settings:
-   ```js
-   CONFIG = {
-    debug: true; // Change this to true
-   };
-   ```
-2. Open Developer Tools in League Client:
-
-   - Press `Ctrl + Shift + I`
-
-3. Reproduce the issue
-4. Copy all relevant console logs
-5. Include these logs in your bug report
+Include: plugin name, version, steps to reproduce, expected vs actual behavior, and console logs.
 
 ---
 
