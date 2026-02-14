@@ -31,7 +31,7 @@ let data = [
   const DEFAULT_CONFIG = {
     debug: false,
     endpoint: "/lol-player-report-sender/v1/match-history-reports",
-    categories: ["NEGATIVE_ATTITUDE", "VERBAL_ABUSE", "INAPPROPRIATE_NAME"],
+    categories: ["ASSISTING_ENEMY_TEAM", "VERBAL_ABUSE"],
     retryAttempts: 3,
     retryDelay: 1000,
     reportDelay: 500, // Delay between reports to avoid rate limiting
@@ -204,24 +204,23 @@ let data = [
                   </lol-uikit-flat-input>
                   <lol-uikit-flat-button id="add-whitelist-btn">Add</lol-uikit-flat-button>
                 </div>
-                ${
-                  CONFIG.whitelistedPlayers.size > 0
-                    ? `
+                ${CONFIG.whitelistedPlayers.size > 0
+            ? `
                   <div id="whitelist-container" style="max-height: 200px; overflow-y: auto; background: #0a0a0a; border: 1px solid #785a28; padding: 10px;">
                     ${Array.from(CONFIG.whitelistedPlayers)
-                      .map(
-                        (name) => `
+              .map(
+                (name) => `
                       <div class="whitelist-item">
                         <span>${name}</span>
                         <lol-uikit-flat-button class="remove-whitelist" data-name="${name}">Remove</lol-uikit-flat-button>
                       </div>
                     `
-                      )
-                      .join("")}
+              )
+              .join("")}
                   </div>
                 `
-                    : ""
-                }
+            : ""
+          }
               </div>
             </div>
           </div>
