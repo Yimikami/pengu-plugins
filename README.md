@@ -109,7 +109,7 @@ Click the settings gear icon (bottom-right corner of the client) to configure:
 
 - 📈 Win rate, W/L count, and KDA stats
 - 🔍 Filter by queue type (Ranked, Normal, ARAM, Swiftplay)
-- 🗓️ Season 15 filter
+- 🗓️ Season 16 filter
 - ⚙️ Configurable game count (1–200)
 
 <details>

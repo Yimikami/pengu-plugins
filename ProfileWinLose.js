@@ -41,7 +41,7 @@ let data = [
     cacheExpiry: 5 * 60 * 1000, // 5 minutes
     selectedQueue: "all", // Default queue type, filters matches from the last "gamesCount" games
     kdaDisplay: "show", // KDA display option: "show", "hide"
-    seasonStartDate: new Date("2025-01-09T00:00:00Z").getTime(), // Season 15 start date
+    seasonStartDate: new Date("2026-01-09T00:00:00Z").getTime(), // Season 16 start date
     seasonFilter: "on", // Season filter option: "on", "off"
   };
 
@@ -188,9 +188,8 @@ let data = [
               <div style="display: flex; align-items: center; gap: 10px;">
                 <p class="lol-settings-window-size-text">Games to analyze:</p>
                 <lol-uikit-flat-input type="number" style="width: 80px;">
-                  <input type="number" min="1" max="200" value="${
-                    CONFIG.gamesCount
-                  }" 
+                  <input type="number" min="1" max="200" value="${CONFIG.gamesCount
+          }" 
                          style="width: 100%; text-align: center;">
                 </lol-uikit-flat-input>
               </div>
@@ -198,31 +197,28 @@ let data = [
                 <p class="lol-settings-window-size-text">Queue Type:</p>
                 <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
                   ${Object.entries(QUEUE_TYPES)
-                    .map(
-                      ([key, value]) => `
-                    <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                      key === CONFIG.selectedQueue
-                    }" value="${key}">
+            .map(
+              ([key, value]) => `
+                    <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${key === CONFIG.selectedQueue
+                }" value="${key}">
                       ${value.name}
                       <div class="lol-tooltip-component"></div>
                     </lol-uikit-dropdown-option>
                   `
-                    )
-                    .join("")}
+            )
+            .join("")}
                 </lol-uikit-framed-dropdown>
               </div>
               <div style="display: flex; align-items: center; gap: 10px;">
                 <p class="lol-settings-window-size-text">Season 15 Filter:</p>
                 <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
-                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                    CONFIG.seasonFilter === "on"
-                  }" value="on">
+                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${CONFIG.seasonFilter === "on"
+          }" value="on">
                     On
                     <div class="lol-tooltip-component"></div>
                   </lol-uikit-dropdown-option>
-                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                    CONFIG.seasonFilter === "off"
-                  }" value="off">
+                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${CONFIG.seasonFilter === "off"
+          }" value="off">
                     Off
                     <div class="lol-tooltip-component"></div>
                   </lol-uikit-dropdown-option>
@@ -231,15 +227,13 @@ let data = [
               <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: thin solid #3c3c41;">
                 <p class="lol-settings-window-size-text">KDA Display:</p>
                 <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
-                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                    CONFIG.kdaDisplay === "show"
-                  }" value="show">
+                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${CONFIG.kdaDisplay === "show"
+          }" value="show">
                     Show KDA
                     <div class="lol-tooltip-component"></div>
                   </lol-uikit-dropdown-option>
-                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${
-                    CONFIG.kdaDisplay === "hide"
-                  }" value="hide">
+                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${CONFIG.kdaDisplay === "hide"
+          }" value="hide">
                     Hide KDA
                     <div class="lol-tooltip-component"></div>
                   </lol-uikit-dropdown-option>
@@ -495,9 +489,8 @@ let data = [
       }
 
       const fetchData = async () => {
-        const endpoint = `/lol-match-history/v1/products/lol/${puuid}/matches?begIndex=0&endIndex=${
-          CONFIG.gamesCount - 1
-        }`;
+        const endpoint = `/lol-match-history/v1/products/lol/${puuid}/matches?begIndex=0&endIndex=${CONFIG.gamesCount - 1
+          }`;
         const response = await fetch(endpoint);
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -522,8 +515,8 @@ let data = [
         CONFIG.selectedQueue === "all"
           ? filteredGames
           : filteredGames.filter(
-              (game) => game.queueId === QUEUE_TYPES[CONFIG.selectedQueue].id
-            );
+            (game) => game.queueId === QUEUE_TYPES[CONFIG.selectedQueue].id
+          );
 
       // Limit to the user-specified number of games after filtering
       const limitedGames = filteredGames.slice(0, CONFIG.gamesCount);
@@ -556,9 +549,9 @@ let data = [
         stats.totalDeaths === 0
           ? (stats.totalKills + stats.totalAssists).toFixed(1)
           : (
-              (stats.totalKills + stats.totalAssists) /
-              stats.totalDeaths
-            ).toFixed(1);
+            (stats.totalKills + stats.totalAssists) /
+            stats.totalDeaths
+          ).toFixed(1);
 
       const result = {
         wins: stats.wins,
@@ -585,11 +578,10 @@ let data = [
           <span class="wins">${wins}W</span>
           <span class="losses">${losses}L</span>
           <span class="winrate">${winRate}%</span>
-          ${
-            CONFIG.kdaDisplay === "show"
-              ? `<span class="kda">${kda}|KDA</span>`
-              : ""
-          }
+          ${CONFIG.kdaDisplay === "show"
+          ? `<span class="kda">${kda}|KDA</span>`
+          : ""
+        }
         </div>
       `;
 
