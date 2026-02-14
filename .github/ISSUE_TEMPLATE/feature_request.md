@@ -37,3 +37,4 @@ assignees: ""
 - [ ] Rune Plugin
 - [ ] ForceBadge
 - [ ] Champion Dismisser
+- [ ] SoloQ Machine
