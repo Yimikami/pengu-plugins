@@ -154,11 +154,68 @@
             if (!CONFIG.removeElements.enabled) return;
             this._styleEl = document.createElement('style');
             this._styleEl.id = 'soloq-machine-styles';
-            this._styleEl.textContent = CONFIG.removeElements.selectors
-                .map((s) => `${s} { display: none !important; }`)
-                .join('\n');
+            this._styleEl.textContent = [
+                ...CONFIG.removeElements.selectors.map((s) => `${s} { display: none !important; }`),
+                '.custom-game-tournament-code-container { display: none !important; }',
+                '[data-soloq-machine-hidden="true"] { display: none !important; }',
+            ].join('\n');
             (document.head || document.documentElement).appendChild(this._styleEl);
             log('Injected hide styles');
+        }
+
+        normalizeText(text) {
+            return (text || '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .toLowerCase();
+        }
+
+        setHidden(el, hidden) {
+            if (!el) return;
+            if (hidden) {
+                el.dataset.soloqMachineHidden = 'true';
+            } else {
+                delete el.dataset.soloqMachineHidden;
+            }
+        }
+
+        isRankedLabel(text) {
+            return /\branked\b/.test(text);
+        }
+
+        isSummonersRiftCard(card) {
+            const title = this.normalizeText(card.querySelector('.parties-game-type-card-name')?.textContent);
+            return title === "summoner's rift" || title === 'summoners rift';
+        }
+
+        applyRankedOnlyFilters(root = document) {
+            if (!CONFIG.removeElements.enabled || !root?.querySelectorAll) return;
+
+            root.querySelectorAll('.parties-game-navs-item').forEach((item) => {
+                const text = this.normalizeText(item.textContent);
+                const keep = text === 'pvp';
+                this.setHidden(item, !keep);
+            });
+
+            root.querySelectorAll('.game-type-card').forEach((card) => {
+                const categories = Array.from(card.querySelectorAll('.parties-game-type-card-category-div'));
+                if (categories.length === 0) return;
+                if (!this.isSummonersRiftCard(card)) {
+                    this.setHidden(card, true);
+                    categories.forEach((category) => this.setHidden(category, true));
+                    return;
+                }
+
+                let hasRankedCategory = false;
+                categories.forEach((category) => {
+                    const text = this.normalizeText(category.textContent);
+                    const keep = this.isRankedLabel(text);
+                    if (keep) hasRankedCategory = true;
+                    this.setHidden(category, !keep);
+                });
+
+                this.setHidden(card, !hasRankedCategory);
+            });
         }
 
         startPhasePolling() {
@@ -410,6 +467,8 @@
                     btn.dataset.soloqMachineAdded = 'true';
                     this.handlePlayButton(btn);
                 });
+
+                this.applyRankedOnlyFilters(root);
             };
 
             check(document.body);
