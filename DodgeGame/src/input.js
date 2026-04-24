@@ -60,14 +60,21 @@ export class Input {
       const k = e.key.toLowerCase();
       this.keys.add(k);
       // Summoner spell keybinds (fire once per press, no autorepeat).
+      let consumedBySpell = false;
       if (this.onSpellKey && !e.repeat) {
         for (const [spellId, bind] of Object.entries(this.keybinds)) {
           if (bind === k) {
             e.preventDefault();
             this.onSpellKey(spellId);
+            consumedBySpell = true;
             break;
           }
         }
+      }
+      // LoL-native: pressing S cancels the current move order (stop in place).
+      if (!consumedBySpell && k === "s") {
+        e.preventDefault();
+        this.moveTarget = null;
       }
     };
     this._onKeyUp = (e) => this.keys.delete(e.key.toLowerCase());
