@@ -57,34 +57,39 @@ export class DodgeGame {
   }
 
   // ---- persistence ------------------------------------------------------
-  async loadPersistent() {
-    if (!window.DataStore?.get) return;
+  get _ds() { return window.DataStore || (typeof DataStore !== "undefined" ? DataStore : null); }
+
+  loadPersistent() {
+    const ds = this._ds;
+    if (!ds?.get) return;
     try {
-      const bs = await window.DataStore.get(CONFIG.DATASTORE_KEY_BEST);
-      this.highScore = bs ? parseInt(bs, 10) || 0 : 0;
-      const ch = await window.DataStore.get(CONFIG.DATASTORE_KEY_CHAMP);
-      if (ch) {
-        const id = parseInt(ch, 10);
+      const bs = ds.get(CONFIG.DATASTORE_KEY_BEST, 0);
+      const n = typeof bs === "number" ? bs : parseInt(bs, 10);
+      this.highScore = Number.isFinite(n) && n > 0 ? n : 0;
+
+      const ch = ds.get(CONFIG.DATASTORE_KEY_CHAMP);
+      if (ch != null) {
+        const id = typeof ch === "number" ? ch : parseInt(ch, 10);
         if (championById(id)) this.selectedChampionId = id;
       }
-      const kbRaw = await window.DataStore.get(CONFIG.DATASTORE_KEY_KEYS);
-      if (kbRaw) {
-        try {
-          const parsed = JSON.parse(kbRaw);
-          if (parsed?.flash && typeof parsed.flash === "string") this.keybinds.flash = parsed.flash.toLowerCase();
-          if (parsed?.ghost && typeof parsed.ghost === "string") this.keybinds.ghost = parsed.ghost.toLowerCase();
-        } catch { /* ignore malformed */ }
-      }
+
+      const kb = ds.get(CONFIG.DATASTORE_KEY_KEYS);
+      // Tolerate legacy values that were stored as JSON-stringified strings.
+      const parsed = typeof kb === "string" ? (() => { try { return JSON.parse(kb); } catch { return null; } })() : kb;
+      if (parsed?.flash && typeof parsed.flash === "string") this.keybinds.flash = parsed.flash.toLowerCase();
+      if (parsed?.ghost && typeof parsed.ghost === "string") this.keybinds.ghost = parsed.ghost.toLowerCase();
+
       this.ui.cacheHighScore(this.highScore);
     } catch (e) { debug("persistent load err", e); }
   }
 
-  async savePersistent() {
-    if (!window.DataStore?.set) return;
+  savePersistent() {
+    const ds = this._ds;
+    if (!ds?.set) return;
     try {
-      await window.DataStore.set(CONFIG.DATASTORE_KEY_BEST, String(this.highScore));
-      await window.DataStore.set(CONFIG.DATASTORE_KEY_CHAMP, String(this.selectedChampionId));
-      await window.DataStore.set(CONFIG.DATASTORE_KEY_KEYS, JSON.stringify(this.keybinds));
+      ds.set(CONFIG.DATASTORE_KEY_BEST, this.highScore);
+      ds.set(CONFIG.DATASTORE_KEY_CHAMP, this.selectedChampionId);
+      ds.set(CONFIG.DATASTORE_KEY_KEYS, this.keybinds);
     } catch (e) { debug("persistent save err", e); }
   }
 
