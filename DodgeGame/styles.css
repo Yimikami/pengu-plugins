@@ -1,0 +1,343 @@
+/* --------------------------------------------------------------------------
+   DodgeGame — overlay, panels, HUD. LoL-native palette (gold/navy).
+   -------------------------------------------------------------------------- */
+
+#dodge-game-overlay {
+  position: fixed; inset: 0; z-index: 99998;
+  background: #010a13;
+  color: #f0e6d2;
+  font-family: var(--font-body, "Spiegel", sans-serif);
+  user-select: none;
+}
+
+#dodge-game-overlay canvas.dg-webgl {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+#dodge-game-overlay .dg-hud,
+#dodge-game-overlay .dg-hud * {
+  /* HUD must never intercept clicks — otherwise right-click-to-move
+     in the top stats band would be eaten by the score/wave/dodged labels. */
+  pointer-events: none !important;
+}
+#dodge-game-overlay .dg-hud {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+}
+#dodge-game-overlay .dg-top {
+  /* Right padding leaves room for the close (X) button so the Dodged
+     chip never ends up sitting underneath it. */
+  padding: 22px 82px 0 32px;
+  display: grid; grid-template-columns: 1fr auto 1fr;
+  align-items: flex-start; gap: 16px;
+}
+#dodge-game-overlay .dg-chip {
+  display: flex; flex-direction: column;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, rgba(10, 20, 40, 0.7), rgba(1, 10, 19, 0.85));
+  border: 1px solid #463714; border-top: 1px solid #c8aa6e;
+  min-width: 110px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  text-shadow: 0 2px 6px #000;
+}
+#dodge-game-overlay .dg-chip.score { justify-self: start; align-items: flex-start; }
+#dodge-game-overlay .dg-chip.wave  { justify-self: center; align-items: center; }
+#dodge-game-overlay .dg-chip.dodged {
+  justify-self: end; align-items: flex-end;
+  border-top-color: #4ec9ff;
+  transition: transform .2s ease-out, box-shadow .2s ease-out;
+}
+#dodge-game-overlay .dg-chip.dodged.pulse {
+  animation: dg-dodge-pulse .5s ease-out;
+}
+@keyframes dg-dodge-pulse {
+  0%   { transform: translateY(0) scale(1);   box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+  35%  { transform: translateY(-4px) scale(1.08); box-shadow: 0 8px 28px rgba(78,201,255,.5); }
+  100% { transform: translateY(0) scale(1);   box-shadow: 0 4px 20px rgba(0,0,0,.4); }
+}
+#dodge-game-overlay .dg-chip .dg-k {
+  font-size: 10px; color: #a09b8c;
+  letter-spacing: 3px; text-transform: uppercase;
+}
+#dodge-game-overlay .dg-chip .dg-v {
+  font-family: var(--font-display, "BeaufortforLOL", serif);
+  font-size: 28px; color: #c8aa6e; letter-spacing: 2px;
+  line-height: 1.1;
+}
+#dodge-game-overlay .dg-chip.wave .dg-v { color: #f0e6d2; }
+#dodge-game-overlay .dg-chip.dodged .dg-v { color: #4ec9ff; }
+#dodge-game-overlay .dg-wavebar {
+  position: absolute; top: 92px; left: 50%;
+  transform: translateX(-50%);
+  width: 260px; height: 4px;
+  background: rgba(200, 170, 110, 0.15);
+}
+#dodge-game-overlay .dg-wavebar > span {
+  display: block; height: 100%;
+  background: #c8aa6e; width: 0%;
+  transition: width 0.1s linear;
+}
+
+/* Summoner spell bar — bottom-center */
+#dodge-game-overlay .dg-spellbar {
+  position: absolute; bottom: 22px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 14px;
+}
+#dodge-game-overlay .dg-spell {
+  position: relative; width: 72px; height: 72px;
+  background: linear-gradient(180deg, rgba(10, 20, 40, 0.8), rgba(1, 10, 19, 0.92));
+  border: 1px solid #463714;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 0 16px rgba(200, 170, 110, 0.08);
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+#dodge-game-overlay .dg-spell.ready {
+  border-color: #c8aa6e;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), inset 0 0 18px rgba(200, 170, 110, 0.25);
+}
+#dodge-game-overlay .dg-spell.active {
+  border-color: #88ccff;
+  box-shadow: 0 4px 26px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(136, 204, 255, 0.35);
+}
+#dodge-game-overlay .dg-spell-icon {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  image-rendering: -webkit-optimize-contrast;
+}
+#dodge-game-overlay .dg-spell-cd {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 0%;
+  background: rgba(0, 0, 0, 0.7);
+  transition: height 0.15s linear;
+}
+#dodge-game-overlay .dg-spell-cd-text {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display, "BeaufortforLOL", serif);
+  font-size: 22px; color: #f0e6d2;
+  text-shadow: 0 1px 3px #000;
+}
+#dodge-game-overlay .dg-spell-key {
+  position: absolute; top: 2px; right: 4px;
+  font-size: 10px; letter-spacing: 1px;
+  color: #c8aa6e;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1px 5px; border-radius: 2px;
+}
+#dodge-game-overlay .dg-spell-name {
+  position: absolute; bottom: -18px; left: 0; right: 0;
+  text-align: center;
+  font-size: 10px; letter-spacing: 2px;
+  color: #a09b8c; text-transform: uppercase;
+  text-shadow: 0 1px 2px #000;
+}
+
+#dodge-game-overlay .dg-close {
+  position: absolute; top: 16px; right: 22px;
+  width: 40px; height: 40px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid #463714;
+  color: #cdbe91;
+  font-size: 22px; line-height: 0;
+  cursor: pointer; pointer-events: auto;
+}
+#dodge-game-overlay .dg-close:hover {
+  color: #f0e6d2; border-color: #c8aa6e;
+}
+
+/* Panel (menu / champion select / loading / game over) */
+#dodge-game-overlay .dg-panel {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(860px, 90vw);
+  max-height: 86vh;
+  background: linear-gradient(180deg, rgba(10, 20, 40, 0.97), rgba(1, 10, 19, 0.99));
+  border: 1px solid #463714;
+  border-top: 2px solid #c8aa6e;
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.85);
+  padding: 34px 44px;
+  overflow: auto;
+  pointer-events: auto;
+}
+#dodge-game-overlay .dg-panel h1 {
+  font-family: var(--font-display, "BeaufortforLOL", serif);
+  font-size: 36px; font-weight: 400;
+  letter-spacing: 7px; text-transform: uppercase;
+  color: #f0e6d2; margin: 0; text-align: center;
+}
+#dodge-game-overlay .dg-panel .dg-sub {
+  text-align: center; color: #a09b8c;
+  font-size: 12px; letter-spacing: 4px; text-transform: uppercase;
+  margin-top: 4px; margin-bottom: 22px;
+}
+#dodge-game-overlay .dg-how {
+  color: #cdbe91; font-size: 13px; line-height: 1.75;
+  text-align: center;
+}
+#dodge-game-overlay .dg-how b { color: #c8aa6e; }
+#dodge-game-overlay .dg-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #463714, transparent);
+  margin: 22px 0;
+}
+#dodge-game-overlay .dg-stats-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 14px; margin: 14px 0;
+}
+#dodge-game-overlay .dg-stats-row.single {
+  grid-template-columns: minmax(200px, 320px);
+  justify-content: center;
+}
+#dodge-game-overlay .dg-box {
+  padding: 12px; text-align: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid #1e2328;
+}
+#dodge-game-overlay .dg-box .dg-n {
+  font-family: var(--font-display, "BeaufortforLOL", serif);
+  font-size: 26px; letter-spacing: 2px; color: #c8aa6e;
+}
+#dodge-game-overlay .dg-box .dg-l {
+  font-size: 10px; color: #a09b8c;
+  letter-spacing: 2px; text-transform: uppercase;
+}
+#dodge-game-overlay .dg-actions {
+  display: flex; justify-content: center;
+  gap: 14px; margin-top: 24px;
+}
+
+/* Summoner-spell slot editor (LoL-native D↔F swap) */
+#dodge-game-overlay .dg-slot-row {
+  display: flex; justify-content: center; align-items: center;
+  gap: 28px; margin: 20px 0 8px;
+}
+#dodge-game-overlay .dg-slot {
+  position: relative;
+  width: 96px; height: 96px;
+  background: linear-gradient(180deg, rgba(10, 20, 40, 0.85), rgba(1, 10, 19, 0.95));
+  border: 1px solid #463714; border-top: 2px solid #c8aa6e;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5), inset 0 0 16px rgba(200, 170, 110, 0.12);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+#dodge-game-overlay .dg-slot.empty {
+  border-top-color: #463714;
+  opacity: 0.55;
+}
+#dodge-game-overlay .dg-slot-key {
+  position: absolute; top: 4px; left: 6px;
+  font-family: var(--font-display, "BeaufortforLOL", serif);
+  font-size: 16px; letter-spacing: 2px; color: #c8aa6e;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1px 8px;
+}
+#dodge-game-overlay .dg-slot-icon {
+  width: 58px; height: 58px;
+  border: 1px solid #463714;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  object-fit: cover;
+  margin-top: 6px;
+}
+#dodge-game-overlay .dg-slot-name {
+  font-family: var(--font-display, "BeaufortforLOL", serif);
+  font-size: 12px; letter-spacing: 2px; color: #cdbe91;
+  margin-top: 6px; text-transform: uppercase;
+}
+#dodge-game-overlay .dg-swap-btn {
+  width: 52px; height: 52px;
+  background: radial-gradient(circle at center, rgba(200,170,110,0.18), rgba(10,20,40,0.8) 70%);
+  border: 1px solid #c8aa6e;
+  color: #f0e6d2;
+  font-size: 26px; line-height: 1;
+  cursor: pointer;
+  transition: transform .2s ease, border-color .2s, box-shadow .2s, color .15s;
+}
+#dodge-game-overlay .dg-swap-btn:hover {
+  transform: rotate(180deg);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(200, 170, 110, 0.45);
+}
+
+/* Champion grid */
+#dodge-game-overlay .dg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+  margin: 4px 0 10px;
+  max-height: 360px; overflow-y: auto;
+  padding: 4px;
+}
+#dodge-game-overlay .dg-card {
+  cursor: pointer; text-align: center;
+  padding: 8px 4px 10px;
+  border: 1px solid #1e2328;
+  background: rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s, border-color 0.15s, background 0.15s;
+}
+#dodge-game-overlay .dg-card:hover {
+  transform: translateY(-2px);
+  border-color: #c8aa6e;
+}
+#dodge-game-overlay .dg-card.active {
+  border-color: #c8aa6e;
+  background: linear-gradient(180deg, rgba(200, 170, 110, 0.15), rgba(0, 0, 0, 0.4));
+  box-shadow: inset 0 0 16px rgba(200, 170, 110, 0.25);
+}
+#dodge-game-overlay .dg-card img {
+  width: 68px; height: 68px; border-radius: 50%;
+  border: 2px solid #463714;
+  object-fit: cover;
+}
+#dodge-game-overlay .dg-card.active img { border-color: #c8aa6e; }
+#dodge-game-overlay .dg-card div {
+  margin-top: 6px;
+  font-size: 11px; color: #cdbe91;
+  letter-spacing: 1px;
+}
+
+/* Loading panel */
+#dodge-game-overlay .dg-loading { text-align: center; }
+#dodge-game-overlay .dg-progress {
+  width: 100%; height: 6px;
+  background: rgba(200, 170, 110, 0.12);
+  margin-top: 22px; overflow: hidden;
+}
+#dodge-game-overlay .dg-progress > span {
+  display: block; height: 100%; width: 0%;
+  background: linear-gradient(90deg, #785a28, #c8aa6e, #f0e6d2);
+  transition: width 0.15s linear;
+}
+#dodge-game-overlay .dg-progress-txt {
+  margin-top: 10px; font-size: 12px;
+  color: #a09b8c; letter-spacing: 3px; text-transform: uppercase;
+}
+
+/* Toast */
+#dodge-game-overlay .dg-toast {
+  position: absolute; top: 22%; left: 50%;
+  transform: translate(-50%, 0);
+  font-family: var(--font-display, "BeaufortforLOL", serif);
+  font-size: 54px; letter-spacing: 12px;
+  color: #c8aa6e;
+  text-shadow: 0 0 24px rgba(200, 170, 110, 0.6), 0 2px 8px #000;
+  opacity: 0;
+  transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+#dodge-game-overlay .dg-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -10px);
+}
+
+/* Error message */
+#dodge-game-overlay .dg-error {
+  color: #ff6b6b; font-size: 13px;
+  text-align: center; margin-top: 14px; line-height: 1.6;
+}

@@ -24,6 +24,7 @@
 | [Force Badge](#-force-badge) | `0.0.1` | Game Pass badge on all champions & skins |
 | [ARAM Bot Enabler](#-aram-bot-enabler) | `0.0.1` | Add bots to ARAM custom games |
 | [Instant Ranked Lobby](#-instant-ranked-lobby) | `0.0.1` | One-click ranked lobby (standalone) |
+| [Dodge Game](#-dodge-game) | `0.1.0` | In-client 3D skillshot dodge mini-game |
 
 ---
 
@@ -190,6 +191,24 @@ Click the settings gear icon (bottom-right corner of the client) to configure:
 
 ---
 
+## 🎮 Dodge Game
+
+> A native-feeling, in-client 3D mini-game. Pick one of 15 champions and dodge iconic skillshots from across Runeterra.
+
+<details>
+<summary><b>📖 Usage</b></summary>
+
+1. Press `Ctrl+K` → select **Launch Dodge Game** (group: *Dodge Game*)
+2. Choose a champion from the grid
+3. **Right-click** to move (LoL-native); **D** = Flash, **F** = Ghost (rebind in Settings)
+4. **Escape** to pause
+
+On first launch the plugin pulls Three.js from `esm.sh` (~3 MB, cached) and the chosen champion's GLB from `cdn.modelviewer.lol` (~1–17 MB per champion, cached).
+
+</details>
+
+---
+
 ## 🚀 Installation
 
 ```
@@ -202,11 +221,15 @@ Click the settings gear icon (bottom-right corner of the client) to configure:
     ├── 📄 ChampionDismisser.js
     ├── 📄 MassReport.js
     ├── 📄 ForceBadge.js
-    └── 📄 AramBotEnabler.js
+    ├── 📄 AramBotEnabler.js
+    └── 📁 DodgeGame/          ← folder-based plugin (copy the whole folder)
+        ├── index.js
+        ├── styles.css
+        └── src/
 ```
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
-2. Copy desired plugin files to your plugins directory
+2. Copy desired plugin files (`.js`) **or the `DodgeGame/` folder** to your plugins directory
 3. Restart the League client
 
 ---
