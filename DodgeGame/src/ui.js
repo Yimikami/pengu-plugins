@@ -32,11 +32,13 @@ export class UI {
     this.canvas = null;
     this.hudEl = null;
     this.toastTimer = null;
+    this._doc = document; // may be swapped to a popup's document
   }
 
-  open() {
+  open(doc) {
     if (this.overlay) return;
-    const overlay = document.createElement("div");
+    if (doc) this._doc = doc;
+    const overlay = this._doc.createElement("div");
     overlay.id = CONFIG.OVERLAY_ID;
     overlay.innerHTML = `
       <canvas class="dg-webgl"></canvas>
@@ -44,7 +46,7 @@ export class UI {
       <div class="dg-panel"></div>
       <div class="dg-toast"></div>
     `;
-    document.body.appendChild(overlay);
+    this._doc.body.appendChild(overlay);
     this.overlay = overlay;
     this.canvas = overlay.querySelector("canvas.dg-webgl");
     overlay.querySelector(".dg-close").addEventListener("click", () => this.onClose?.());
@@ -97,9 +99,9 @@ export class UI {
         <div class="dg-box"><div class="dg-n">${highScore}</div><div class="dg-l">Best Score</div></div>
       </div>
       <div class="dg-actions">
-        <lol-uikit-flat-button id="dg-select">Choose Champion</lol-uikit-flat-button>
-        <lol-uikit-flat-button-secondary id="dg-settings">Settings</lol-uikit-flat-button-secondary>
-        <lol-uikit-flat-button-secondary id="dg-menu-close">Cancel</lol-uikit-flat-button-secondary>
+        <button class="dg-btn" id="dg-select">Choose Champion</button>
+        <button class="dg-btn dg-btn-sec" id="dg-settings">Settings</button>
+        <button class="dg-btn dg-btn-sec" id="dg-menu-close">Cancel</button>
       </div>
     `;
     panel.querySelector("#dg-select").addEventListener("click", () => this.renderChampionSelect({ selectedId: this._lastSelected }));
@@ -154,7 +156,7 @@ export class UI {
         <b>Ghost</b>: +${Math.round((SPELLS.ghost.speedMult-1)*100)}% move speed for ${(SPELLS.ghost.duration/1000)|0}s · ${(SPELLS.ghost.cooldown/1000)|0}s cooldown
       </div>
       <div class="dg-actions">
-        <lol-uikit-flat-button id="dg-back">Back</lol-uikit-flat-button>
+        <button class="dg-btn" id="dg-back">Back</button>
       </div>
     `;
     panel.querySelector("#dg-swap").addEventListener("click", () => {
@@ -176,10 +178,10 @@ export class UI {
       <div class="dg-sub">Take a breath</div>
       <div class="dg-how">Press <b>Esc</b> or click Resume to jump back in.</div>
       <div class="dg-actions" style="flex-wrap:wrap;">
-        <lol-uikit-flat-button id="dg-resume">Resume</lol-uikit-flat-button>
-        <lol-uikit-flat-button-secondary id="dg-pause-settings">Settings</lol-uikit-flat-button-secondary>
-        <lol-uikit-flat-button-secondary id="dg-pause-resel">Change Champion</lol-uikit-flat-button-secondary>
-        <lol-uikit-flat-button-secondary id="dg-pause-exit">Exit</lol-uikit-flat-button-secondary>
+        <button class="dg-btn" id="dg-resume">Resume</button>
+        <button class="dg-btn dg-btn-sec" id="dg-pause-settings">Settings</button>
+        <button class="dg-btn dg-btn-sec" id="dg-pause-resel">Change Champion</button>
+        <button class="dg-btn dg-btn-sec" id="dg-pause-exit">Exit</button>
       </div>
     `;
     panel.querySelector("#dg-resume").addEventListener("click", () => onResume?.());
@@ -209,8 +211,8 @@ export class UI {
         First load per champion downloads the model (~1–17 MB) from the public model CDN.
       </div>
       <div class="dg-actions">
-        <lol-uikit-flat-button id="dg-play">Enter the Arena</lol-uikit-flat-button>
-        <lol-uikit-flat-button-secondary id="dg-back">Back</lol-uikit-flat-button-secondary>
+        <button class="dg-btn" id="dg-play">Enter the Arena</button>
+        <button class="dg-btn dg-btn-sec" id="dg-back">Back</button>
       </div>
     `;
     panel.querySelectorAll(".dg-card").forEach((el) => {
@@ -250,7 +252,7 @@ export class UI {
       <div class="dg-sub">Could not prepare the fight</div>
       <div class="dg-error">${msg}</div>
       <div class="dg-actions">
-        <lol-uikit-flat-button id="dg-retry">Back to Menu</lol-uikit-flat-button>
+        <button class="dg-btn" id="dg-retry">Back to Menu</button>
       </div>
     `;
     panel.querySelector("#dg-retry").addEventListener("click", () => onBack?.());
@@ -274,9 +276,9 @@ export class UI {
         ? `<div class="dg-how" style="color:#c8aa6e;">◆ <b>NEW PERSONAL BEST</b> ◆</div>`
         : `<div class="dg-how">Best <b>${highScore}</b> &middot; Time <b>${((s.survivedMs || 0) / 1000).toFixed(1)}s</b></div>`}
       <div class="dg-actions">
-        <lol-uikit-flat-button id="dg-again">Rematch</lol-uikit-flat-button>
-        <lol-uikit-flat-button-secondary id="dg-reselect">Change Champion</lol-uikit-flat-button-secondary>
-        <lol-uikit-flat-button-secondary id="dg-menu">Menu</lol-uikit-flat-button-secondary>
+        <button class="dg-btn" id="dg-again">Rematch</button>
+        <button class="dg-btn dg-btn-sec" id="dg-reselect">Change Champion</button>
+        <button class="dg-btn dg-btn-sec" id="dg-menu">Menu</button>
       </div>
     `;
     panel.querySelector("#dg-again").addEventListener("click", () => this.onRematch?.());
@@ -290,7 +292,7 @@ export class UI {
     const existing = this.overlay.querySelector(".dg-hud");
     if (existing) existing.remove();
     const kb = keybinds || this._keybinds || {};
-    const hud = document.createElement("div");
+    const hud = this._doc.createElement("div");
     hud.className = "dg-hud";
     hud.innerHTML = `
       <div class="dg-top">

@@ -212,6 +212,33 @@
   gap: 14px; margin-top: 24px;
 }
 
+/* LoL-styled buttons (replaces <lol-uikit-flat-button> for popup compat) */
+#dodge-game-overlay .dg-btn {
+  padding: 10px 28px;
+  font-family: var(--font-display, "BeaufortforLOL", serif);
+  font-size: 14px; letter-spacing: 2px; text-transform: uppercase;
+  color: #cdbe91;
+  background: linear-gradient(180deg, #1e2328, #1a1e23);
+  border: 2px solid #c8aa6e;
+  cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s, box-shadow .15s;
+}
+#dodge-game-overlay .dg-btn:hover {
+  color: #f0e6d2;
+  background: linear-gradient(180deg, rgba(200,170,110,0.18), #1a1e23);
+  box-shadow: 0 0 14px rgba(200,170,110,0.3);
+}
+#dodge-game-overlay .dg-btn:active { transform: scale(0.97); }
+#dodge-game-overlay .dg-btn.dg-btn-sec {
+  border-color: #463714;
+  color: #a09b8c;
+  background: linear-gradient(180deg, #141820, #10141a);
+}
+#dodge-game-overlay .dg-btn.dg-btn-sec:hover {
+  border-color: #785a28; color: #cdbe91;
+  box-shadow: 0 0 10px rgba(200,170,110,0.15);
+}
+
 /* Summoner-spell slot editor (LoL-native D↔F swap) */
 #dodge-game-overlay .dg-slot-row {
   display: flex; justify-content: center; align-items: center;

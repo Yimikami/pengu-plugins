@@ -35,6 +35,8 @@ export class DodgeGame {
     this._three = null;          // { THREE, GLTFLoader }
     this._scene = null;          // scene bundle from buildScene()
     this._input = null;
+    this._popupWin = null;       // popup window (null = overlay in main window)
+    this._popupDoc = null;
     this._actionState = { current: null };
     this.player = null;
     this.projectiles = [];
@@ -115,14 +117,77 @@ export class DodgeGame {
     } catch (e) { debug("summoner fetch err", e); }
   }
 
+  // ---- popup window ------------------------------------------------------
+  get _win() { return this._popupWin || window; }
+  get _doc() { return this._popupDoc || document; }
+
+  _openPopup() {
+    const W = 1280, H = 720;
+    let win;
+    try {
+      win = window.open("about:blank", "dodgeGamePopup",
+        `width=${W},height=${H},left=100,top=100`);
+    } catch { /* popup blocked */ }
+    if (!win) return null;
+
+    // League Client CEF: resize + center via riotInvoke (reference:
+    // github.com/mfro/league-client-upgrade — Window.ResizeTo / CenterToScreen)
+    try {
+      const invoke = (name, params = []) =>
+        win.riotInvoke?.({ request: JSON.stringify({ name, params }) });
+      invoke("Window.ResizeTo", [W, H]);
+      invoke("Window.CenterToScreen");
+      invoke("Window.Show");
+    } catch { /* not in CEF, ignore */ }
+
+    // Write a minimal HTML shell with our CSS so the popup looks identical.
+    const css = this._getGameCSS();
+    const doc = win.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Dodge Game</title><style>${css}</style></head>
+<body style="margin:0;overflow:hidden;background:#010a13;"></body></html>`);
+    doc.close();
+
+    return { win, doc };
+  }
+
+  _getGameCSS() {
+    // Grab the stylesheet that contains our #dodge-game-overlay rules.
+    for (const sheet of document.styleSheets) {
+      try {
+        const rules = [...sheet.cssRules];
+        if (rules.some((r) => r.cssText?.includes("#dodge-game-overlay"))) {
+          return rules.map((r) => r.cssText).join("\n");
+        }
+      } catch { /* cross-origin sheet, skip */ }
+    }
+    return "";
+  }
+
   // ---- overlay lifecycle -----------------------------------------------
   openMenu() {
     if (this.ui.overlay) return;
-    this.ui.open();
+
+    // Try to open a popup window so the League Client stays usable.
+    const popup = this._openPopup();
+    if (popup) {
+      this._popupWin = popup.win;
+      this._popupDoc = popup.doc;
+      // If the user manually closes the popup, tear down the game.
+      popup.win.addEventListener("beforeunload", () => {
+        // Guard against recursive close.
+        if (this.state === "idle") return;
+        this._popupWin = null;
+        this._popupDoc = null;
+        this.close();
+      });
+    }
+
+    this.ui.open(this._popupDoc || undefined);
+
     this._escHandler = (e) => {
       if (e.key !== "Escape") return;
-      // In-game: pause instead of closing. On the pause screen: resume.
-      // Elsewhere (menu / game over): close the overlay.
       if (this.state === "running") {
         e.preventDefault(); e.stopPropagation();
         this.pauseGame();
@@ -133,9 +198,7 @@ export class DodgeGame {
         this.close();
       }
     };
-    // Capture phase so the in-game keydown listener can't get to it first
-    // and e.g. fire a summoner spell bound to Escape.
-    window.addEventListener("keydown", this._escHandler, true);
+    this._win.addEventListener("keydown", this._escHandler, true);
     this.state = "menu";
     this.ui.cacheHighScore(this.highScore);
     this.ui.cacheKeybinds(this.keybinds);
@@ -211,6 +274,7 @@ export class DodgeGame {
       if (p.spawnTs) p.spawnTs += offset;
       if (p.telegraphUntil) p.telegraphUntil += offset;
       if (p.activeUntil) p.activeUntil += offset;
+      if (p.hitAfter) p.hitAfter += offset;
     }
     for (const key of Object.keys(this.spellState)) {
       const s = this.spellState[key];
@@ -223,17 +287,27 @@ export class DodgeGame {
   }
 
   close() {
-    if (!this.ui.overlay) return;
+    if (!this.ui.overlay && !this._popupWin) return;
     this.stopLoop();
     if (this._input) this._input.detach();
     this._input = null;
     this.disposeScene();
-    if (this._escHandler) window.removeEventListener("keydown", this._escHandler, true);
+    if (this._escHandler) {
+      try { this._win.removeEventListener("keydown", this._escHandler, true); } catch {}
+    }
     this._escHandler = null;
-    if (this._resizeHandler) window.removeEventListener("resize", this._resizeHandler);
+    if (this._resizeHandler) {
+      try { this._win.removeEventListener("resize", this._resizeHandler); } catch {}
+    }
     this._resizeHandler = null;
     this.ui.removeHud();
     this.ui.close();
+    // Close the popup window if it's still open.
+    if (this._popupWin && !this._popupWin.closed) {
+      try { this._popupWin.close(); } catch {}
+    }
+    this._popupWin = null;
+    this._popupDoc = null;
     this.state = "idle";
   }
 
@@ -261,6 +335,7 @@ export class DodgeGame {
         SkeletonUtils: this._three.SkeletonUtils,
         canvas: this.ui.canvas,
         modelData,
+        win: this._win,
       });
       this._actionState = { current: null };
       this._setAction("idle");
@@ -284,17 +359,20 @@ export class DodgeGame {
         overlay: this.ui.overlay,
         keybinds: this.keybinds,
         onSpellKey: (spellId) => this._castSpell(spellId),
+        win: this._win,
+        doc: this._doc,
       });
       this._input.attach();
 
+      const targetWin = this._win;
       this._resizeHandler = () => {
         const { renderer, camera } = this._scene;
-        const w = window.innerWidth, h = window.innerHeight;
+        const w = targetWin.innerWidth, h = targetWin.innerHeight;
         renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
       };
-      window.addEventListener("resize", this._resizeHandler);
+      targetWin.addEventListener("resize", this._resizeHandler);
 
       this.ui.hidePanel();
       this.ui.buildHud(this.keybinds);
@@ -405,28 +483,34 @@ export class DodgeGame {
   }
 
   // ---- main loop --------------------------------------------------------
+  _raf(cb) { return (this._popupWin?.requestAnimationFrame || requestAnimationFrame).call(this._win, cb); }
+  _caf(id) { return (this._popupWin?.cancelAnimationFrame || cancelAnimationFrame).call(this._win, id); }
+
   startLoop() {
     this.lastFrame = performance.now();
-    const tick = (ts) => {
-      this.rafId = requestAnimationFrame(tick);
-      const dt = Math.min(0.05, (ts - this.lastFrame) / 1000);
-      this.lastFrame = ts;
+    // IMPORTANT: Do NOT use the RAF timestamp parameter — when the game runs
+    // in a popup window its time origin differs from the main window's.
+    // All game timestamps (startTs, telegraphUntil, hitAfter, spell cooldowns…)
+    // are set via the main window's performance.now(), so we must stay consistent.
+    const tick = () => {
+      this.rafId = this._raf(tick);
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - this.lastFrame) / 1000);
+      this.lastFrame = now;
       if (this.state === "running") {
-        this.update(dt, ts);
+        this.update(dt, now);
       } else if (this.state === "over" && this._scene?.mixer) {
         this._scene.mixer.update(dt);
       }
-      // When paused we neither update nor advance animations — the scene
-      // freezes in place but is still rendered so the pause menu overlays it.
       if (this._scene?.renderer) {
         this._scene.renderer.render(this._scene.scene, this._scene.camera);
       }
     };
-    this.rafId = requestAnimationFrame(tick);
+    this.rafId = this._raf(tick);
   }
 
   stopLoop() {
-    if (this.rafId) cancelAnimationFrame(this.rafId);
+    if (this.rafId) this._caf(this.rafId);
     this.rafId = null;
   }
 
@@ -444,7 +528,7 @@ export class DodgeGame {
   }
 
   _spawnInterval(wave) {
-    return Math.max(320, 1700 - wave * 140);
+    return Math.max(420, 1800 - wave * 115);
   }
 
   _addEffect(effect) { if (effect) this._effects.push(effect); }
@@ -511,7 +595,7 @@ export class DodgeGame {
     const spawnInterval = this._spawnInterval(wave);
     if (ts - this.lastSpawn < spawnInterval) return;
     this.lastSpawn = ts;
-    const simultaneous = Math.min(3, 1 + Math.floor((wave - 1) / 3));
+    const simultaneous = Math.min(3, 1 + Math.floor((wave - 1) / 4));
     for (let i = 0; i < simultaneous; i++) {
       this.spawnProjectile(ts, i * 140);
     }

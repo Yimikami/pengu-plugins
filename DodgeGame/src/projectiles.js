@@ -163,6 +163,9 @@ function buildAoe({ THREE, scene, skill, player, base }) {
     type: "AOE_CIRCLE",
     cx, cz, radius: skill.radius,
     activeUntil: base.telegraphUntil + skill.activeTime,
+    // Detonation grace: the visual fires but the hitbox waits a beat so the
+    // player can actually *see* the explosion before it can kill them.
+    hitAfter: base.telegraphUntil + Math.min(skill.activeTime * 0.35, 120),
     disc, ring, boom,
   });
   base.meshes.push(disc, ring, boom);
@@ -219,6 +222,7 @@ function buildBeam({ THREE, scene, skill, player, base }) {
     ox, oz, dirX: dxN, dirZ: dzN,
     length, width: skill.width,
     activeUntil: base.telegraphUntil + skill.activeTime,
+    hitAfter: base.telegraphUntil + Math.min(skill.activeTime * 0.12, 60),
     telegraph, beam, holder,
   });
   base.meshes.push(holder);
@@ -268,12 +272,15 @@ export function updateProjectile(p, dt, ts) {
     p.head.position.set(hx, WORLD.hitY, hz);
   } else if (p.type === "AOE_CIRCLE") {
     const k = clamp((ts - p.telegraphUntil) / p.skill.activeTime, 0, 1);
-    p.disc.material.opacity = (1 - k) * 0.8;
-    p.ring.material.opacity = (1 - k) * 0.9;
+    // Bright initial flash that fades — makes the detonation moment readable.
+    const flash = k < 0.25 ? 1 : Math.max(0, 1 - (k - 0.25) / 0.75);
+    p.disc.material.opacity = flash * 0.85;
+    p.ring.material.opacity = flash * 0.95;
+    p.ring.scale.set(1, 1, 1);
     p.boom.visible = true;
-    const bs = 0.5 + k * 0.8;
+    const bs = 0.6 + k * 0.7;
     p.boom.scale.set(bs, bs, bs);
-    p.boom.material.opacity = (1 - k) * 0.8;
+    p.boom.material.opacity = flash * 0.9;
     if (ts >= p.activeUntil) p.expired = true;
   } else if (p.type === "BEAM") {
     const k = clamp((ts - p.telegraphUntil) / p.skill.activeTime, 0, 1);
@@ -309,6 +316,8 @@ export function disposeProjectile(p, scene) {
 export function checkProjectileHit(p, px, pz, pR) {
   const now = performance.now();
   if (p.expired || now < p.telegraphUntil) return null;
+  // Detonation grace: visual plays but hitbox waits so the player sees it.
+  if (p.hitAfter && now < p.hitAfter) return null;
   const s = p.skill;
 
   if (p.type === "LINEAR" || p.type === "BOOMERANG") {

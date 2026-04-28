@@ -45,12 +45,13 @@ function loadGroundTexture(THREE) {
 // ---------------------------------------------------------------------------
 // Main scene builder
 // ---------------------------------------------------------------------------
-export function buildScene({ THREE, SkeletonUtils, canvas, modelData }) {
+export function buildScene({ THREE, SkeletonUtils, canvas, modelData, win }) {
+  const _win = win || window;
   const renderer = new THREE.WebGLRenderer({
     canvas, antialias: true, alpha: false,
   });
-  renderer.setPixelRatio(window.devicePixelRatio || 1);
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.setPixelRatio(_win.devicePixelRatio || 1);
+  renderer.setSize(_win.innerWidth, _win.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -60,7 +61,7 @@ export function buildScene({ THREE, SkeletonUtils, canvas, modelData }) {
   scene.background = new THREE.Color(0x0f1d16);
   scene.fog = new THREE.Fog(0x0f1d16, 30, 72);
 
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 200);
+  const camera = new THREE.PerspectiveCamera(45, _win.innerWidth / _win.innerHeight, 0.1, 200);
   camera.position.set(0, 18, 14);
   camera.lookAt(0, 0, 0);
 

@@ -8,7 +8,7 @@
 // inside the game overlay.
 // ---------------------------------------------------------------------------
 export class Input {
-  constructor({ THREE, canvas, camera, overlay, keybinds, onSpellKey }) {
+  constructor({ THREE, canvas, camera, overlay, keybinds, onSpellKey, win, doc }) {
     this.THREE = THREE;
     this.canvas = canvas;
     this.camera = camera;
@@ -18,6 +18,8 @@ export class Input {
     this.cursorWorld = null; // last valid ground-cursor position (for Flash aim)
     this.keybinds = keybinds || { flash: "d", ghost: "f" };
     this.onSpellKey = onSpellKey;
+    this._win = win || window;
+    this._doc = doc || document;
 
     this._plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this._ndc = new THREE.Vector2();
@@ -80,19 +82,19 @@ export class Input {
     this._onKeyUp = (e) => this.keys.delete(e.key.toLowerCase());
 
     // Capture phase so nothing upstream can swallow the events.
-    document.addEventListener("contextmenu", this._onContext, true);
-    document.addEventListener("mousedown", this._onMouseDown, true);
-    document.addEventListener("mousemove", this._onMouseMove, true);
-    window.addEventListener("keydown", this._onKeyDown, true);
-    window.addEventListener("keyup", this._onKeyUp, true);
+    this._doc.addEventListener("contextmenu", this._onContext, true);
+    this._doc.addEventListener("mousedown", this._onMouseDown, true);
+    this._doc.addEventListener("mousemove", this._onMouseMove, true);
+    this._win.addEventListener("keydown", this._onKeyDown, true);
+    this._win.addEventListener("keyup", this._onKeyUp, true);
   }
 
   detach() {
-    document.removeEventListener("contextmenu", this._onContext, true);
-    document.removeEventListener("mousedown", this._onMouseDown, true);
-    document.removeEventListener("mousemove", this._onMouseMove, true);
-    window.removeEventListener("keydown", this._onKeyDown, true);
-    window.removeEventListener("keyup", this._onKeyUp, true);
+    this._doc.removeEventListener("contextmenu", this._onContext, true);
+    this._doc.removeEventListener("mousedown", this._onMouseDown, true);
+    this._doc.removeEventListener("mousemove", this._onMouseMove, true);
+    this._win.removeEventListener("keydown", this._onKeyDown, true);
+    this._win.removeEventListener("keyup", this._onKeyUp, true);
     this.keys.clear();
     this.moveTarget = null;
     this.cursorWorld = null;
