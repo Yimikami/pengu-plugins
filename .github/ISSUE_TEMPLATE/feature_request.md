@@ -30,11 +30,14 @@ assignees: ""
 
 <!-- Which plugin(s) would this feature be for? -->
 
-- [ ] Profile Win/Loss Display
-- [ ] Mass Report Plugin
-- [ ] Icon Swapper
-- [ ] Instant Ranked Lobby
-- [ ] Rune Plugin
-- [ ] ForceBadge
-- [ ] Champion Dismisser
 - [ ] SoloQ Machine
+- [ ] Rune Plugin
+- [ ] Icon Swapper
+- [ ] Profile Win/Loss
+- [ ] Champion Dismisser
+- [ ] Mass Report
+- [ ] Force Badge
+- [ ] ARAM Bot Enabler
+- [ ] Instant Ranked Lobby
+- [ ] Dodge Game
+- [ ] Pengu Family

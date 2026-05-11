@@ -25,6 +25,7 @@
 | [ARAM Bot Enabler](#-aram-bot-enabler) | `0.0.1` | Add bots to ARAM custom games |
 | [Instant Ranked Lobby](#-instant-ranked-lobby) | `0.0.1` | One-click ranked lobby (standalone) |
 | [Dodge Game](#-dodge-game) | `0.1.0` | In-client 3D skillshot dodge mini-game |
+| [Pengu Family](#-pengu-family) | `0.1.0` | Virtual pet pengu companion that lives in your client 🚧 |
 
 ---
 
@@ -209,6 +210,38 @@ On first launch the plugin pulls Three.js from `esm.sh` (~3 MB, cached) and the 
 
 ---
 
+## 🐧 Pengu Family
+
+> 🚧 **Under Active Development** — This plugin receives frequent updates with new features, improvements, and bug fixes. Bugs and occasional issues are expected while I polish the experience. See the [Roadmap](PenguFamily/docs/ROADMAP.md) for upcoming plans.
+
+<img src="PenguFamily/assets/tb.png" alt="Pengu Family" width="500" />
+
+> A virtual pet penguin that lives in your League client. Raise it, feed it, play with it, and watch it react to your games.
+
+- 🥚 **5 Archetypes** — Windblade, Shadow, Starlight, Chaos, Royal — each with unique personality & AI
+- � **Stat System** — Hunger, Happiness, Energy decay over time; feed & pet to restore
+- 🧠 **Smart AI** — Pengu wanders, follows/flees cursor, visits points of interest, reacts to game phases
+- 🛒 **Shop** — Buy snacks, treats, energy drinks, toys, XP boosts, lullabies with earned coins
+- 📋 **Quests** — Daily, weekly, and repeatable quests for coins & XP
+- 🎮 **Game Tracking** — Earns XP & coins from wins/losses, reacts to victories and defeats
+- 🗣️ **Chat Bubbles** — Personality-driven dialogue for idle chatter, moods, phases, hunger, and more
+- 🌀 **Fling Physics** — Drag and throw your pengu with momentum, friction, and edge bouncing
+- ⭐ **Evolution** — Baby → Adult → Elder stages as your pengu levels up
+
+<details>
+<summary><b>📖 Usage</b></summary>
+
+1. Pengu appears automatically when you open the client
+2. **Double-click** to pet · **Right-click** to open the Hub
+3. **Drag** to move · release with speed to fling
+4. Hub has 4 tabs: **Status**, **Shop**, **Quests**, **Settings**
+5. Earn coins by playing games, complete quests for bonus rewards
+6. Buy items from the shop to feed, boost, or put your pengu to sleep
+
+</details>
+
+---
+
 ## 🚀 Installation
 
 ```
@@ -222,14 +255,19 @@ On first launch the plugin pulls Three.js from `esm.sh` (~3 MB, cached) and the 
     ├── 📄 MassReport.js
     ├── 📄 ForceBadge.js
     ├── 📄 AramBotEnabler.js
-    └── 📁 DodgeGame/          ← folder-based plugin (copy the whole folder)
+    ├── 📁 DodgeGame/          ← folder-based plugin (copy the whole folder)
+    │   ├── index.js
+    │   ├── styles.css
+    │   └── src/
+    └── 📁 PenguFamily/        ← folder-based plugin (copy the whole folder)
         ├── index.js
         ├── styles.css
+        ├── assets/
         └── src/
 ```
 
 1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
-2. Copy desired plugin files (`.js`) **or the `DodgeGame/` folder** to your plugins directory
+2. Copy desired plugin files (`.js`) **or folder-based plugins** (`DodgeGame/`, `PenguFamily/`) to your plugins directory
 3. Restart the League client
 
 ---

@@ -49,7 +49,19 @@ Paste your console logs here
 
 ## 📱 Environment
 
-- Plugin Name & Version:
+- Plugin:
+  - [ ] SoloQ Machine
+  - [ ] Rune Plugin
+  - [ ] Icon Swapper
+  - [ ] Profile Win/Loss
+  - [ ] Champion Dismisser
+  - [ ] Mass Report
+  - [ ] Force Badge
+  - [ ] ARAM Bot Enabler
+  - [ ] Instant Ranked Lobby
+  - [ ] Dodge Game
+  - [ ] Pengu Family
+- Plugin Version:
 - Pengu Loader Version:
 - League Client Version:
 - Operating System:
