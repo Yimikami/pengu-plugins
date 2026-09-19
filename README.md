@@ -1,256 +1,156 @@
-<div align="center">
+# Pengu Plugins
 
-# ⚡ Pengu Plugins
+Nine independent plugins for the League of Legends client, powered by [Pengu Loader](https://github.com/PenguLoader/PenguLoader).
 
-**A premium collection of plugins for League of Legends via [Pengu Loader](https://github.com/PenguLoader/PenguLoader)**
+Install only the plugins you want. Each plugin is available separately.
 
-[![Pengu Loader](https://img.shields.io/badge/Pengu_Loader-Compatible-0596aa?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZmZmIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnoiLz48L3N2Zz4=)](https://github.com/PenguLoader/PenguLoader)
-[![License](https://img.shields.io/badge/License-MIT-c8aa6e?style=for-the-badge)](LICENSE)
+[Downloads](#downloads) · [Installation](#installation) · [Plugin guide](#plugin-guide) · [Get help](#troubleshooting)
 
-</div>
+## Downloads
 
----
+Download each ready-to-install plugin from its own release.
 
-## 📦 Plugins
+| Plugin | Download | What it does |
+| --- | --- | --- |
+| [SoloQ Machine](#soloq-machine) | [SoloQMachine.js](https://github.com/Yimikami/pengu-plugins/releases/download/soloq-machine/v0.0.2/SoloQMachine.js) | Queue, accept, honor and play-again automation |
+| [Rune Plugin](#rune-plugin) | [RunePlugin.js](https://github.com/Yimikami/pengu-plugins/releases/download/rune-plugin/v0.0.6/RunePlugin.js) | Automatic runes and item sets |
+| [Icon Swapper](#icon-swapper) | [IconSwapper.js](https://github.com/Yimikami/pengu-plugins/releases/download/icon-swapper/v0.1.1/IconSwapper.js) | Local summoner icon customization |
+| [Profile Win/Loss](#profile-winloss) | [ProfileWinLose.js](https://github.com/Yimikami/pengu-plugins/releases/download/profile-win-loss/v0.0.4/ProfileWinLose.js) | Profile win rate, match counts and KDA |
+| [Champion Dismisser](#champion-dismisser) | [ChampionDismisser.js](https://github.com/Yimikami/pengu-plugins/releases/download/champion-dismisser/v0.0.3/ChampionDismisser.js) | Blacklist owned champions; excludes Classic variants |
+| [Mass Report](#mass-report) | [MassReport.js](https://github.com/Yimikami/pengu-plugins/releases/download/mass-report/v0.0.5/MassReport.js) | Match-history reporting with whitelist controls |
+| [Force Badge](#force-badge) | [ForceBadge.js](https://github.com/Yimikami/pengu-plugins/releases/download/force-badge/v0.0.2/ForceBadge.js) | Visual Game Pass badges for champions and skins |
+| [Instant Ranked Lobby](#instant-ranked-lobby) | [InstantRankedLobby.js](https://github.com/Yimikami/pengu-plugins/releases/download/instant-ranked-lobby/v0.0.2/InstantRankedLobby.js) | Create a ranked Solo/Duo lobby from Play |
+| [Dodge Game](#dodge-game) | [DodgeGame-0.1.1.zip](https://github.com/Yimikami/pengu-plugins/releases/download/dodge-game/v0.1.1/DodgeGame-0.1.1.zip) | In-client 3D skillshot dodge mini-game |
 
-| Plugin | Version | Description |
-|--------|---------|-------------|
-| [SoloQ Machine](#-soloq-machine) | `0.0.1` | Full ranked autopilot — queue, accept, honor, play again |
-| [Rune Plugin](#-rune-plugin) | `0.0.4` | Auto runes & item sets from U.GG / Lolalytics |
-| [Icon Swapper](#-icon-swapper) | `0.1.0` | Change your summoner icon to anything (client-side) |
-| [Profile Win/Loss](#-profile-winloss) | `0.0.3` | Win/loss stats on any profile page |
-| [Champion Dismisser](#-champion-dismisser) | `0.0.1` | Blacklist champions from champ select |
-| [Mass Report](#-mass-report) | `0.0.3` | Batch reporting from match history |
-| [Force Badge](#-force-badge) | `0.0.1` | Game Pass badge on all champions & skins |
-| [ARAM Bot Enabler](#-aram-bot-enabler) | `0.0.1` | Add bots to ARAM custom games |
-| [Instant Ranked Lobby](#-instant-ranked-lobby) | `0.0.1` | One-click ranked lobby (standalone) |
-| [Dodge Game](#-dodge-game) | `0.1.0` | In-client 3D skillshot dodge mini-game |
+For older versions, browse [all releases](https://github.com/Yimikami/pengu-plugins/releases). Use the named plugin asset, rather than GitHub's **Source code** archives, which contain the whole repository.
 
----
+## Installation
 
-## 🤖 SoloQ Machine
+1. Install and enable [Pengu Loader](https://github.com/PenguLoader/PenguLoader).
+2. Download the plugins you want from the table above.
+3. Put each `.js` file directly in Pengu Loader's `plugins` folder. For Dodge Game, extract the ZIP and put the complete `DodgeGame` folder there.
+4. Restart the League client.
 
-> Your ranked autopilot. Automates the entire ranked flow so you can focus on the game.
+Example with Rune Plugin and Dodge Game installed:
 
-**What it does:**
-
-| Feature | Details |
-|---------|---------|
-| **Auto Accept** | Accepts match with configurable delay |
-| **Auto Matchmaking** | Starts queue automatically when entering lobby |
-| **Wait for Invites** | Holds queue until pending invitations are answered |
-| **Min. Lobby Members** | Requires N players (1–5) before starting queue |
-| **Auto Honor** | Honors a random ally after game |
-| **Auto Play Again** | Returns to lobby with configurable delay |
-| **Instant Ranked Lobby** | Play button → ranked Solo/Duo lobby |
-| **UI Cleanup** | Hides distracting elements (nav menus, social, notifications) |
-
-<details>
-<summary><b>⚙️ Configuration</b></summary>
-
-Click the settings gear icon (bottom-right corner of the client) to configure:
-
-- **Queue Automation** — Auto Accept, Auto Matchmaking, delays, lobby conditions
-- **Post-Game** — Auto Honor, Auto Play Again, play-again delay
-- **Lobby** — Instant Ranked Lobby toggle
-- **UI** — Hide Distracting Elements toggle
-- **Debug** — Debug Logging toggle
-
-</details>
-
----
-
-## 🔄 Rune Plugin
-
-> Automatically fetches and applies optimal runes and item sets during champion select.
-
-- 🎯 Fetches from **U.GG** or **Lolalytics** (configurable)
-- 📦 Auto-creates item sets (most popular, highest winrate, situational)
-- 🗺️ Role-specific configurations with automatic position detection
-- ⚔️ Arena mode support
-- ⚙️ Settings in client settings panel
-
-<details>
-<summary><b>📖 Usage</b></summary>
-
-1. Enter champion select and pick your champion
-2. Runes are auto-applied based on position + champion + latest patch
-3. Item sets are created with popular/winrate builds
-4. Configure provider and item sets in **Settings → Rune Plugin**
-
-</details>
-
----
-
-## 🎭 Icon Swapper
-
-> Change your summoner icon to any icon from Community Dragon or upload your own.
-
-- 🌐 Browse all League icons from Community Dragon API
-- 📂 Upload custom icons (local file or URL)
-- 🔍 Search icons by ID
-- 💾 Persistent via DataStore
-- ↩️ One-click revert to default
-
-<details>
-<summary><b>📖 Usage</b></summary>
-
-1. Press `Ctrl+K` → select **Change Summoner Icon**
-2. Browse or search League icons, or switch to Custom Icons tab
-3. Upload local files or paste image URLs
-4. Click any icon to apply
-
-</details>
-
----
-
-## 📊 Profile Win/Loss
-
-> Win/loss statistics displayed directly on summoner profiles.
-
-- 📈 Win rate, W/L count, and KDA stats
-- 🔍 Filter by queue type (Ranked, Normal, ARAM, Swiftplay)
-- 🗓️ Season 16 filter
-- ⚙️ Configurable game count (1–200)
-
-<details>
-<summary><b>📖 Usage</b></summary>
-
-1. Open any summoner profile — stats appear automatically
-2. Configure in **Settings → Profile Win/Loss**:
-   - Games to analyze, Queue Type, Season filter, KDA display
-
-</details>
-
----
-
-## 🚫 Champion Dismisser
-
-> Blacklist champions to prevent yourself from picking them.
-
-- 🚫 Greyed-out & unclickable in champion select
-- 🔍 Searchable configuration modal
-- 💾 Persistent blacklist via DataStore
-- 🗑️ Clear All button
-
-<details>
-<summary><b>📖 Usage</b></summary>
-
-1. Press `Ctrl+K` → select **Configure Blacklist**
-2. Search and click champions to toggle blacklist
-3. Blacklisted champions appear greyed out in champ select
-
-</details>
-
----
-
-## ⚖️ Mass Report
-
-> Batch reporting from match history with whitelist protection.
-
-- 🎯 Report all, enemy-only, or ally-only
-- ⭐ Whitelist system to protect players
-- 📝 Toast notifications for each report
-- ⚙️ Settings in client settings panel
-
-<details>
-<summary><b>📖 Usage</b></summary>
-
-1. Open a match in history → enter Game ID
-2. Select target (All / Enemy / Ally)
-3. Click **Report**
-
-</details>
-
----
-
-## 🏆 Force Badge
-
-> Shows the Game Pass rewards badge on all champions and skins.
-
-- ✨ Badge on all champions in Collection and Champion Select
-- 🎨 Reward flag on owned skins
-- Zero configuration — works automatically
-
----
-
-## 🤖 ARAM Bot Enabler
-
-> Add bots to ARAM custom games. *(May not be working)*
-
-- Add bots to either team
-- Choose champion and difficulty (Intro / Beginner / Intermediate)
-
----
-
-## ⚡ Instant Ranked Lobby
-
-> Standalone version — instantly creates a ranked Solo/Duo lobby when pressing Play.
-
-> **Note:** This feature is already included in [SoloQ Machine](#-soloq-machine). Use this only if you want the lobby shortcut without the full suite.
-
----
-
-## 🎮 Dodge Game
-
-> A native-feeling, in-client 3D mini-game. Pick one of 15 champions and dodge iconic skillshots from across Runeterra.
-
-<details>
-<summary><b>📖 Usage</b></summary>
-
-1. Press `Ctrl+K` → select **Launch Dodge Game** (group: *Dodge Game*)
-2. Choose a champion from the grid
-3. **Right-click** to move (LoL-native); **D** = Flash, **F** = Ghost (rebind in Settings)
-4. **Escape** to pause
-
-On first launch the plugin pulls Three.js from `esm.sh` (~3 MB, cached) and the chosen champion's GLB from `cdn.modelviewer.lol` (~1–17 MB per champion, cached).
-
-</details>
-
----
-
-## 🚀 Installation
-
-```
-📂 Pengu Loader/
-└── 📂 plugins/
-    ├── 📄 SoloQMachine.js
-    ├── 📄 RunePlugin.js
-    ├── 📄 IconSwapper.js
-    ├── 📄 ProfileWinLose.js
-    ├── 📄 ChampionDismisser.js
-    ├── 📄 MassReport.js
-    ├── 📄 ForceBadge.js
-    ├── 📄 AramBotEnabler.js
-    └── 📁 DodgeGame/          ← folder-based plugin (copy the whole folder)
+```text
+Pengu Loader/
+└── plugins/
+    ├── RunePlugin.js
+    └── DodgeGame/
         ├── index.js
         ├── styles.css
+        ├── assets/
         └── src/
 ```
 
-1. Install [Pengu Loader](https://github.com/PenguLoader/PenguLoader)
-2. Copy desired plugin files (`.js`) **or the `DodgeGame/` folder** to your plugins directory
-3. Restart the League client
+**Updating:** close the client, replace the previous file or folder with the new download, then reopen the client. Keep the original filename and avoid duplicate copies. Existing settings are retained.
 
----
+**Removing a plugin:** close the client and remove its file or folder from `plugins`. If Rune Plugin has backed up one of your personal pages, restore it before removing the plugin.
 
-## 🐛 Troubleshooting
+MCP and Node.js are not required to use these plugins. Some features download external data, libraries or models and need an internet connection.
 
-1. Ensure Pengu Loader is up to date
-2. Restart the League client
-3. Enable **Debug Logging** in plugin settings for console output
-4. Open DevTools with `Ctrl + Shift + I` to view logs
+## Plugin guide
 
-**Report issues:** [GitHub Issues](https://github.com/Yimikami/pengu-plugins/issues) · [hi@yimikami.me](mailto:hi@yimikami.me)
+### SoloQ Machine
 
-Include: plugin name, version, steps to reproduce, expected vs actual behavior, and console logs.
+Automates ready-check acceptance, matchmaking, honor and returning to the lobby. It also includes an instant ranked lobby shortcut and optional client UI cleanup.
 
----
+Open the plugin's gear button in the bottom-right corner to configure automation, delays, pending invitations and minimum lobby members. Matchmaking requires the configured queue and lobby leadership.
 
-<div align="center">
+Automation and UI cleanup are enabled by default on a fresh installation. Review the settings before entering a lobby.
 
-Made with ❤️ for the League community
+### Rune Plugin
 
-[Report Bug](https://github.com/Yimikami/pengu-plugins/issues/new?labels=bug&template=bug_report.md) · [Request Feature](https://github.com/Yimikami/pengu-plugins/issues/new?labels=enhancement&template=feature_request.md)
+Applies champion- and role-specific runes during champion select, using **Lolalytics** or **U.GG**. U.GG failures fall back to Lolalytics; optional item sets come from Lolalytics.
 
-</div>
+- Configure it in **Client Settings → Rune Plugin**.
+- Generated page names are short, such as `[R] Ahri Mid`.
+- The plugin reuses its own page and preserves unrelated item sets.
+- If all rune-page slots are full, including on two-page accounts, it backs up an editable personal page locally and updates that page in place. It does not delete your pages.
+- To recover that personal page, press `Ctrl+K` → **Restore backed-up rune page**. Automatic runes pause for the rest of the current champion select after a successful restore.
+
+The backup belongs to the current account and is stored in Pengu's local data. Keep that data until you restore the page.
+
+### Icon Swapper
+
+Changes how your summoner icon appears locally in the client.
+
+Press `Ctrl+K` → **Change Summoner Icon** to browse the icon catalog, search by ID, or use a custom image file or URL. The catalog loads in pages of 96 icons. **Revert** restores the original appearance without restarting.
+
+This is a local visual change; it does not unlock icons or change what other players see.
+
+### Profile Win/Loss
+
+Displays win rate, wins/losses and optional KDA on summoner profiles.
+
+Open **Client Settings → Profile Win/Loss** to choose the number of games to analyze and the queue filter. There is no fixed season or date cutoff; results use the available match history within your selected limits.
+
+### Champion Dismisser
+
+Helps you avoid selecting champions you have blacklisted.
+
+Press `Ctrl+K` → **Configure Blacklist**, then search and click champions to toggle them. Blacklisted champions are greyed out and blocked in the champion-select interface.
+
+Only champions you own are listed. Free-rotation-only champions and League Classic variants are excluded.
+
+### Mass Report
+
+Adds report controls to opened matches in match history.
+
+1. Open a match. Its Game ID is filled in automatically when detected; manual entry is available if detection fails.
+2. Choose allies, enemies or all players.
+3. Review your whitelist and report settings in **Client Settings → Mass Report**, then click **Report**.
+
+Reports are sent only when you click the button. Confirmed reports are remembered per account to avoid repeat submissions. Use reports for actual misconduct.
+
+### Force Badge
+
+Shows Game Pass-style badges on champion and skin thumbnails. It runs automatically and has no settings.
+
+This changes the client presentation only; it does not grant Game Pass benefits or ownership.
+
+### Instant Ranked Lobby
+
+Turns the **Play** button into a shortcut for creating a ranked Solo/Duo lobby.
+
+SoloQ Machine already includes this feature. Choose this standalone plugin if you only want the shortcut.
+
+### Dodge Game
+
+An in-client 3D mini-game with 15 selectable champions and waves of skillshots.
+
+Press `Ctrl+K` → **Launch Dodge Game**, then choose a champion.
+
+| Control | Action |
+| --- | --- |
+| Right-click | Move |
+| S | Stop moving |
+| D / F | Flash / Ghost; swap slots in the game's settings |
+| Escape | Pause |
+
+The first launch downloads the 3D library and selected champion model. Initial loading depends on your connection; loaded resources are cached for reuse.
+
+## Troubleshooting
+
+**Nothing appears or settings are missing**
+
+- Confirm Pengu Loader is enabled and the file ends in `.js`, not `.js_` or `.txt`.
+- Check that there is only one copy of each plugin.
+- Restart the League client after installing, updating or enabling a plugin.
+- For Dodge Game, confirm `DodgeGame/index.js`, `src` and `assets` are present together.
+
+**Runes, icons or models do not load**
+
+- Check your connection. External providers can be temporarily unavailable.
+- For runes, try Lolalytics in the plugin settings.
+
+**Still having trouble?**
+
+- [Report a bug](https://github.com/Yimikami/pengu-plugins/issues/new?template=bug_report.yml)
+- [Ask a question](https://github.com/Yimikami/pengu-plugins/issues/new?template=question.yml)
+- [Suggest a feature](https://github.com/Yimikami/pengu-plugins/issues/new?template=feature_request.yml)
+
+Include the plugin version, Pengu Loader version, League patch and steps to reproduce. Screenshots or relevant console errors help; remove account details and credentials before posting.
+
+These are community plugins for Pengu Loader and are not affiliated with Riot Games. League client updates can affect compatibility.

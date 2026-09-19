@@ -1,0 +1,69 @@
+name: Bug report
+description: Report a plugin that is not working as expected.
+title: "[Bug] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check existing issues first. Share only relevant errors; remove account details, tokens and credentials.
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Affected plugin
+      multiple: true
+      options:
+        - SoloQ Machine
+        - Rune Plugin
+        - Icon Swapper
+        - Profile Win/Loss
+        - Champion Dismisser
+        - Mass Report
+        - Force Badge
+        - Instant Ranked Lobby
+        - Dodge Game
+        - Installation / multiple plugins
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Use the version shown on the release you installed. List each version if several plugins are affected.
+      placeholder: "Rune Plugin 0.0.6"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Pengu Loader version and League patch
+      placeholder: "Pengu 1.1.6, League 16.18; write unknown if unavailable"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open...
+        2. Click...
+        3. The issue appears...
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Describe what should happen and what happens instead.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or console errors
+      description: Optional. Paste relevant errors or attach a screenshot, with personal information removed.
+  - type: textarea
+    id: other-plugins
+    attributes:
+      label: Other plugins or context
+      description: Optional. Mention other installed plugins and whether this began after an update.

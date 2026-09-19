@@ -1,0 +1,35 @@
+name: Usage question
+description: Get help with installation, settings or using a plugin.
+title: "[Question] "
+labels: ["question", "needs-triage"]
+body:
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Related plugin
+      multiple: true
+      options:
+        - SoloQ Machine
+        - Rune Plugin
+        - Icon Swapper
+        - Profile Win/Loss
+        - Champion Dismisser
+        - Mass Report
+        - Force Badge
+        - Instant Ranked Lobby
+        - Dodge Game
+        - Installation / general
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Plugin and Pengu Loader versions
+      description: Include the versions if available.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: Explain what you are trying to do and what you have tried. Remove personal information from screenshots or logs.
+    validations:
+      required: true

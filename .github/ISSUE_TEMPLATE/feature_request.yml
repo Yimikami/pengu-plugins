@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest an improvement to a plugin or the installation experience.
+title: "[Feature] "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Related plugin
+      multiple: true
+      options:
+        - SoloQ Machine
+        - Rune Plugin
+        - Icon Swapper
+        - Profile Win/Loss
+        - Champion Dismisser
+        - Mass Report
+        - Force Badge
+        - Instant Ranked Lobby
+        - Dodge Game
+        - New plugin / repository
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would this help you do?
+      description: Describe the problem or missing behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Suggested behavior
+      description: Describe your idea. Examples and screenshots are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or extra context
+      description: Optional. Mention any workaround you currently use.
