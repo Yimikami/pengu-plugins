@@ -27,7 +27,7 @@ export function getThree() {
       SkeletonUtils: skelMod,
     };
     return _cached;
-  })();
+  })().finally(() => { _pending = null; });
   return _pending;
 }
 

@@ -53,6 +53,7 @@ export class UI {
   }
 
   close() {
+    clearTimeout(this.toastTimer);
     if (!this.overlay) return;
     this.overlay.remove();
     this.overlay = null;
@@ -92,7 +93,7 @@ export class UI {
       <div class="dg-sub">Runeterra Gauntlet</div>
       <div class="dg-how">
         Step into the arena as a real champion and dodge iconic skillshots from across Runeterra.<br>
-        <b>Right-click</b> to move (LoL-native). <b>D</b> = Flash, <b>F</b> = Ghost — rebind in Settings.
+        <b>Right-click</b> to move (LoL-native). <b>D</b> = Flash, <b>F</b> = Ghost — swap their slots in Settings.
       </div>
       <div class="dg-divider"></div>
       <div class="dg-stats-row single">

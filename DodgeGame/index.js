@@ -3,7 +3,7 @@
  * @author       Yimikami
  * @description  In-client 3D skillshot dodge mini-game. Pick a champion, dodge iconic skillshots, survive the waves.
  * @link         https://github.com/Yimikami/pengu-plugins/
- * @version      0.1.0
+ * @version      0.1.1
  */
 
 import "./styles.css";

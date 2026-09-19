@@ -3,7 +3,7 @@
  * @author Yimikami
  * @description Allows blacklisting specific champions to prevent selecting them in Champion Select.
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.1
+ * @version 0.0.3
  */
 
 (() => {
@@ -17,6 +17,7 @@
     STYLE_ID: "champion-dismisser-styles",
     ENDPOINTS: {
       CHAMPION_SUMMARY: "/lol-game-data/assets/v1/champion-summary.json",
+      OWNED_CHAMPIONS: "/lol-champions/v1/owned-champions-minimal",
     },
   };
 
@@ -30,19 +31,22 @@
     constructor() {
       debug("Initializing Champion Dismisser plugin");
       this.champions = [];
+      this.ownedChampionIds = new Set();
       this.blacklist = [];
       this.observer = null;
+      this.blockedNodes = new Set();
+      this.blockClick = (event) => { event.preventDefault(); event.stopImmediatePropagation(); };
       this.init();
     }
 
     async init() {
       try {
         await this.loadBlacklist();
-        await this.fetchChampionData();
         this.injectStyles();
         this.setupCommandBar();
         this.observeDOM();
         this.setupCleanup();
+        await this.fetchChampionData();
       } catch (error) {
         console.error("Champion Dismisser: Initialization failed", error);
       }
@@ -51,7 +55,8 @@
     async loadBlacklist() {
       try {
         const stored = await window.DataStore.get(CONFIG.DATASTORE_KEY);
-        this.blacklist = stored ? JSON.parse(stored) : [];
+        const parsed = stored ? JSON.parse(stored) : [];
+        this.blacklist = Array.isArray(parsed) ? [...new Set(parsed.filter(id => Number.isInteger(id) && id > 0))] : [];
         debug(`Loaded blacklist: ${this.blacklist.length} champions`);
       } catch (error) {
         debug("Error loading blacklist", error);
@@ -74,14 +79,28 @@
 
     async fetchChampionData() {
       try {
-        const res = await fetch(CONFIG.ENDPOINTS.CHAMPION_SUMMARY);
-        const data = await res.json();
+        const responses = await Promise.all([
+          fetch(CONFIG.ENDPOINTS.CHAMPION_SUMMARY),
+          fetch(CONFIG.ENDPOINTS.OWNED_CHAMPIONS),
+        ]);
+        if (responses.some(res => !res.ok)) throw new Error("Champion inventory is unavailable");
+        const [data, inventory] = await Promise.all(responses.map(res => res.json()));
+        if (!Array.isArray(data) || !Array.isArray(inventory)) throw new Error("Invalid champion inventory");
+        const owned = new Set(inventory.filter(c => c.ownership?.owned === true).map(c => c.id));
         this.champions = data
-          .filter((c) => c.id !== -1)
+          // Classic variants have separate IDs (e.g. 60001) and the Jade_ alias prefix.
+          .filter(c => Number.isInteger(c.id) && c.id > 0 && owned.has(c.id) && !/^Jade_/i.test(c.alias || ""))
           .sort((a, b) => a.name.localeCompare(b.name));
-        debug(`Fetched ${this.champions.length} champions`);
+        this.ownedChampionIds = new Set(this.champions.map(c => c.id));
+        this.processExistingChampions();
+        debug(`Fetched ${this.champions.length} owned standard champions`);
+        return true;
       } catch (error) {
+        this.champions = [];
+        this.ownedChampionIds.clear();
+        this.processExistingChampions();
         console.error("Error fetching champions", error);
+        return false;
       }
     }
 
@@ -149,10 +168,19 @@
 
     setupCleanup() {
       window.addEventListener("unload", () => {
-        if (this.observer) this.observer.disconnect();
-        const style = document.getElementById(CONFIG.STYLE_ID);
-        if (style) style.remove();
+        this.cleanup();
       });
+    }
+
+    cleanup() {
+      this.observer?.disconnect();
+      for (const node of this.blockedNodes) {
+        node.removeEventListener("click", this.blockClick, true);
+        node.classList.remove("champion-dismisser-disabled");
+      }
+      this.blockedNodes.clear();
+      document.getElementById(CONFIG.STYLE_ID)?.remove();
+      document.getElementById(CONFIG.MODAL_ID)?.remove();
     }
 
     // --- Core Logic ---
@@ -176,21 +204,28 @@
             });
           } else if (
             mutation.type === "attributes" &&
-            mutation.attributeName === "data-id"
+            this.isChampionNode(mutation.target)
           ) {
             this.checkAndDisableChampion(mutation.target);
           }
         });
+        for (const node of this.blockedNodes) {
+          if (!node.isConnected) {
+            node.removeEventListener("click", this.blockClick, true);
+            this.blockedNodes.delete(node);
+          }
+        }
       });
 
       observer.observe(document.body, {
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ["data-id"],
+        attributeFilter: ["data-id", "champion-id"],
       });
 
       this.observer = observer;
+      this.processExistingChampions();
     }
     
     isChampionNode(node) {
@@ -206,22 +241,20 @@
       if (!node) return;
       const id = node.getAttribute("data-id") || node.getAttribute("champion-id");
 
-      if (id && this.blacklist.includes(parseInt(id))) {
+      if (id && this.ownedChampionIds.has(Number(id)) && this.blacklist.includes(Number(id))) {
         node.classList.add("champion-dismisser-disabled");
-        // Also disable click
-        node.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        };
+        node.addEventListener("click", this.blockClick, true);
+        this.blockedNodes.add(node);
       } else {
         node.classList.remove("champion-dismisser-disabled");
-        node.onclick = null;
+        node.removeEventListener("click", this.blockClick, true);
+        this.blockedNodes.delete(node);
       }
     }
 
     // --- UI Logic ---
 
-    showConfigurationModal() {
+    async showConfigurationModal() {
       const existing = document.getElementById(CONFIG.MODAL_ID);
       if (existing) existing.remove();
 
@@ -248,14 +281,14 @@
             <button id="close-modal" style="background: none; border: none; color: #f0e6d2; font-size: 24px; cursor: pointer;">&times;</button>
         </div>
         <div style="margin-bottom: 20px;">
-            <input type="text" id="champ-search" placeholder="Search champions..." 
+            <input type="text" id="champ-search" placeholder="Search owned champions..."
                 style="width: 100%; padding: 10px; background: #0f1215; border: 1px solid #785a28; color: #f0e6d2; font-size: 16px;">
         </div>
         <div id="champ-grid" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 15px; padding: 10px;">
             <!-- Champions injected here -->
         </div>
         <div style="margin-top: 20px; text-align: right; color: #888;">
-            Click to toggle blacklist status.
+            Owned champions only. Classic champions are excluded.
         </div>
       `;
 
@@ -303,13 +336,18 @@
           }
       };
 
-      renderChampions();
+      grid.textContent = "Loading owned champions...";
+      const loaded = await this.fetchChampionData();
+      if (!modal.isConnected) return;
+      if (loaded) renderChampions(search.value);
+      else grid.textContent = "Could not load owned champions. Close and reopen to retry.";
     }
 
     toggleBlacklist(champId) {
         if (this.blacklist.includes(champId)) {
             this.blacklist = this.blacklist.filter(id => id !== champId);
         } else {
+            if (!this.ownedChampionIds.has(champId)) return;
             this.blacklist.push(champId);
         }
         this.saveBlacklist();

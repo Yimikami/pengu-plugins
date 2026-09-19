@@ -3,7 +3,7 @@
  * @author Yimikami
  * @description Forces the client to always show "Game Pass" badge near champions and skins
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.1
+ * @version 0.0.2
  */
 
 (() => {
@@ -22,6 +22,8 @@
       log("Initializing ForceBadge plugin");
       this.observer = null;
       this.styleElement = null;
+      this.originalBadges = new Map();
+      this.addedClasses = new Map();
       this.init();
     }
 
@@ -123,12 +125,30 @@
         this.observer.disconnect();
         this.observer = null;
       }
+      for (const [wrapper, original] of this.originalBadges) this.restoreBadge(wrapper, original);
+      this.originalBadges.clear();
+      for (const [node, classes] of this.addedClasses) classes.forEach((name) => node.classList.remove(name));
+      this.addedClasses.clear();
       if (this.styleElement && this.styleElement.parentNode) {
         this.styleElement.parentNode.removeChild(this.styleElement);
         this.styleElement = null;
       }
     }
 
+    restoreBadge(wrapper, original) {
+      if (original.created) { wrapper.remove(); return; }
+      wrapper.replaceChildren(...original.nodes);
+      if (original.style === null) wrapper.removeAttribute("style");
+      else wrapper.setAttribute("style", original.style);
+      wrapper.removeAttribute("data-rewards-forcer");
+    }
+
+    addClass(node, name) {
+      if (node.classList.contains(name)) return;
+      if (!this.addedClasses.has(node)) this.addedClasses.set(node, new Set());
+      this.addedClasses.get(node).add(name);
+      node.classList.add(name);
+    }
 
     injectBadgeIfMissing(championItem) {
       const thumbnail = championItem.querySelector(".champion-thumbnail");
@@ -142,6 +162,7 @@
         badgeWrapper = document.createElement("div");
         badgeWrapper.className = "info-badge-wrapper badge-0";
         badgeWrapper.setAttribute("data-rewards-forcer", "true");
+        this.originalBadges.set(badgeWrapper, { created: true });
         
         const badge = document.createElement("img");
         badge.src = "/fe/lol-collections/images/item-element/rewards-program-icon.svg";
@@ -156,6 +177,9 @@
           thumbnail.appendChild(badgeWrapper);
         }
       } else if (!badgeWrapper.getAttribute("data-rewards-forcer")) {
+        if (!this.originalBadges.has(badgeWrapper)) {
+          this.originalBadges.set(badgeWrapper, { nodes: [...badgeWrapper.childNodes], style: badgeWrapper.getAttribute("style") });
+        }
         const existingBadge = badgeWrapper.querySelector("img");
         if (!existingBadge || !existingBadge.src.includes("rewards-program-icon")) {
           log("Replacing existing badge with rewards badge");
@@ -180,12 +204,15 @@
 
     addLoyaltyRewardClass(gridChampion) {
       if (gridChampion.getAttribute("data-id") === "-2") {
+        if (gridChampion.classList.contains("grid-champion-loyalty-reward-new")) {
+          gridChampion.classList.remove("grid-champion-loyalty-reward-new");
+        }
         return;
       }
       
       if (!gridChampion.classList.contains("grid-champion-loyalty-reward-new")) {
         log("Adding loyalty reward class to champion");
-        gridChampion.classList.add("grid-champion-loyalty-reward-new");
+        this.addClass(gridChampion, "grid-champion-loyalty-reward-new");
       }
     }
 
@@ -197,113 +224,51 @@
       const infoDiv = skinItem.querySelector(".skin-selection-item-information");
       if (infoDiv && !infoDiv.classList.contains("loyalty-reward-icon--rewards")) {
         log("Adding loyalty reward icon to skin");
-        infoDiv.classList.add("loyalty-reward-icon--rewards");
+        this.addClass(infoDiv, "loyalty-reward-icon--rewards");
       }
     }
 
     observeDOM() {
-      log("Starting DOM observation");
-      
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          mutation.addedNodes.forEach((node) => {
-            if (node.nodeType === 1) {
-              const championItems = node.querySelectorAll
-                ? node.querySelectorAll(".rcp-fe-lol-champion-mastery-champion-item-lcm, [class*='champion-item']")
-                : [];
-              
-              championItems.forEach((item) => {
-                if (!item.dataset.rewardsBadgeForced) {
-                  item.dataset.rewardsBadgeForced = "true";
-                  this.injectBadgeIfMissing(item);
-                }
-              });
-
-              if (node.classList && 
-                  (node.classList.contains("rcp-fe-lol-champion-mastery-champion-item-lcm") ||
-                   node.className.includes("champion-item"))) {
-                if (!node.dataset.rewardsBadgeForced) {
-                  node.dataset.rewardsBadgeForced = "true";
-                  this.injectBadgeIfMissing(node);
-                }
-              }
-
-              const gridChampions = node.querySelectorAll
-                ? node.querySelectorAll(".grid-champion")
-                : [];
-              
-              gridChampions.forEach((item) => {
-                if (!item.dataset.loyaltyRewardForced) {
-                  item.dataset.loyaltyRewardForced = "true";
-                  this.addLoyaltyRewardClass(item);
-                }
-              });
-
-              if (node.classList && node.classList.contains("grid-champion")) {
-                if (!node.dataset.loyaltyRewardForced) {
-                  node.dataset.loyaltyRewardForced = "true";
-                  this.addLoyaltyRewardClass(node);
-                }
-              }
-
-              const skinItems = node.querySelectorAll
-                ? node.querySelectorAll(".skin-selection-item")
-                : [];
-              
-              skinItems.forEach((item) => {
-                if (!item.dataset.skinRewardForced) {
-                  item.dataset.skinRewardForced = "true";
-                  this.addSkinRewardIcon(item);
-                }
-              });
-
-              if (node.classList && node.classList.contains("skin-selection-item")) {
-                if (!node.dataset.skinRewardForced) {
-                  node.dataset.skinRewardForced = "true";
-                  this.addSkinRewardIcon(node);
-                }
-              }
-            }
-          });
-        });
+      const selectors = ".rcp-fe-lol-champion-mastery-champion-item-lcm, [class*='champion-item'], .grid-champion, .skin-selection-item";
+      this.observer = new MutationObserver((mutations) => {
+        const roots = new Set();
+        for (const mutation of mutations) {
+          if (mutation.target.nodeType === 1) roots.add(mutation.target);
+          for (const node of mutation.addedNodes) if (node.nodeType === 1) roots.add(node);
+        }
+        for (const root of roots) {
+          const owner = root.closest?.(selectors);
+          if (owner) this.processElement(owner);
+          root.querySelectorAll(selectors).forEach((item) => this.processElement(item));
+        }
+        for (const [wrapper, original] of this.originalBadges) {
+          if (!wrapper.isConnected) { this.restoreBadge(wrapper, original); this.originalBadges.delete(wrapper); }
+        }
+        for (const [node, classes] of this.addedClasses) {
+          if (!node.isConnected) {
+            classes.forEach((name) => node.classList.remove(name));
+            this.addedClasses.delete(node);
+          }
+        }
       });
-
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
+      this.observer.observe(document.body, {
+        childList: true, subtree: true, attributes: true,
+        attributeFilter: ["class", "data-id"],
       });
-
-      this.observer = observer;
-
       this.processExistingElements();
     }
 
-    processExistingElements() {
-      log("Processing existing elements on page");
-      
-      document.querySelectorAll(".rcp-fe-lol-champion-mastery-champion-item-lcm, [class*='champion-item']")
-        .forEach((item) => {
-          if (!item.dataset.rewardsBadgeForced) {
-            item.dataset.rewardsBadgeForced = "true";
-            this.injectBadgeIfMissing(item);
-          }
-        });
-
-      document.querySelectorAll(".grid-champion")
-        .forEach((item) => {
-          if (!item.dataset.loyaltyRewardForced) {
-            item.dataset.loyaltyRewardForced = "true";
-            this.addLoyaltyRewardClass(item);
-          }
-        });
-      document.querySelectorAll(".skin-selection-item")
-        .forEach((item) => {
-          if (!item.dataset.skinRewardForced) {
-            item.dataset.skinRewardForced = "true";
-            this.addSkinRewardIcon(item);
-          }
-        });
+    processElement(item) {
+      if (item.matches(".grid-champion")) this.addLoyaltyRewardClass(item);
+      else if (item.matches(".skin-selection-item")) this.addSkinRewardIcon(item);
+      else this.injectBadgeIfMissing(item);
     }
+
+    processExistingElements() {
+      document.querySelectorAll(".rcp-fe-lol-champion-mastery-champion-item-lcm, [class*='champion-item'], .grid-champion, .skin-selection-item")
+        .forEach((item) => this.processElement(item));
+    }
+
   }
 
   window.addEventListener("load", () => {

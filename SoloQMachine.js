@@ -3,8 +3,11 @@
  * @author Yimikami
  * @description Your ranked autopilot: Auto Accept, Auto Matchmaking, Auto Honor, Auto Play Again, Instant Ranked Lobby, UI cleanup, and in-game settings panel
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.1
+ * @version 0.0.2
  */
+
+let soloQSocket;
+export function init(context) { soloQSocket = context.socket; }
 
 (() => {
     const DEFAULT_CONFIG = {
@@ -92,6 +95,10 @@
             this._styleEl = null;
             this._settingsOpen = false;
             this._settingsBtn = null;
+            this._disposed = false;
+            this._actionRevision = 0;
+            this._matchmakingRevision = 0;
+            this._buttonHandlers = new Map();
             this.init();
         }
 
@@ -119,7 +126,7 @@
             };
             if (tryCreate()) return;
             let attempts = 0;
-            const interval = setInterval(() => {
+            const interval = this._readinessTimer = setInterval(() => {
                 attempts++;
                 if (tryCreate() || attempts > 60) {
                     clearInterval(interval);
@@ -137,6 +144,17 @@
 
         cleanup() {
             log('Cleaning up...');
+            this._disposed = true;
+            this._actionRevision++;
+            this.cancelAutoMatchmaking();
+            this._phaseSubscription?.disconnect?.();
+            clearInterval(this._readinessTimer);
+            clearTimeout(this._autoHonorTimer);
+            for (const [button, handler] of this._buttonHandlers) {
+                button.removeEventListener('click', handler, true);
+            }
+            this._buttonHandlers.clear();
+            document.querySelectorAll('[data-soloq-machine-hidden]').forEach((el) => delete el.dataset.soloqMachineHidden);
             if (this._observer) this._observer.disconnect();
             if (this._phasePoller) clearInterval(this._phasePoller);
             if (this._autoAcceptTimer) clearTimeout(this._autoAcceptTimer);
@@ -219,25 +237,35 @@
         }
 
         startPhasePolling() {
-            this._phasePoller = setInterval(() => this.pollPhase(), 1500);
+            if (soloQSocket?.observe) {
+                this._phaseSubscription = soloQSocket.observe('/lol-gameflow/v1/gameflow-phase', (event) => this.setPhase(event.data));
+            }
+            this._phasePoller = setInterval(() => this.pollPhase(), this._phaseSubscription ? 30000 : 3000);
             this.pollPhase();
         }
 
+        setPhase(phase) {
+            if (this._disposed || typeof phase !== 'string' || phase === this._currentPhase) return;
+            const previous = this._currentPhase;
+            this._currentPhase = phase;
+            this.onPhaseChange(phase, previous);
+        }
+
         async pollPhase() {
+            if (this._polling || this._disposed) return;
+            this._polling = true;
+            const revision = this._actionRevision;
             try {
                 const res = await fetch('/lol-gameflow/v1/gameflow-phase');
                 if (!res.ok) return;
                 const phase = await res.json();
-                if (phase !== this._currentPhase) {
-                    const prev = this._currentPhase;
-                    this._currentPhase = phase;
-                    log(`Phase: ${prev} → ${phase}`);
-                    this.onPhaseChange(phase, prev);
-                }
-            } catch { }
+                if (revision === this._actionRevision) this.setPhase(phase);
+            } catch { } finally { this._polling = false; }
         }
 
         onPhaseChange(phase, prev) {
+            this._actionRevision++;
+            clearTimeout(this._autoHonorTimer);
             if (phase === 'ReadyCheck') {
                 this.scheduleAutoAccept();
             } else {
@@ -269,11 +297,12 @@
         }
 
         scheduleAutoAccept() {
-            if (!CONFIG.autoAccept.enabled) return;
             this.cancelAutoAccept();
+            if (!CONFIG.autoAccept.enabled || this._disposed) return;
             const delay = CONFIG.autoAccept.delayMs;
             log(`Will auto-accept in ${delay}ms`);
-            this._autoAcceptTimer = setTimeout(() => this.acceptMatch(), delay);
+            const revision = this._actionRevision;
+            this._autoAcceptTimer = setTimeout(() => this.acceptMatch(revision), delay);
         }
 
         cancelAutoAccept() {
@@ -283,8 +312,17 @@
             }
         }
 
-        async acceptMatch() {
+        async canRunAction(revision, feature, phases) {
+            const current = () => !this._disposed && revision === this._actionRevision && CONFIG[feature].enabled && phases.includes(this._currentPhase);
+            if (!current()) return false;
+            const phase = await lcuFetch('/lol-gameflow/v1/gameflow-phase');
+            const session = await lcuFetch('/lol-gameflow/v1/session');
+            return current() && phases.includes(phase) && session?.gameData?.queue?.id === CONFIG.queueId;
+        }
+
+        async acceptMatch(revision = this._actionRevision) {
             try {
+                if (!await this.canRunAction(revision, 'autoAccept', ['ReadyCheck'])) return;
                 await lcuFetch('/lol-matchmaking/v1/ready-check/accept', 'POST');
                 log('Match accepted!');
             } catch (e) {
@@ -293,14 +331,15 @@
         }
 
         scheduleAutoMatchmaking() {
-            if (!CONFIG.autoMatchmaking.enabled) return;
             this.cancelAutoMatchmaking();
+            if (!CONFIG.autoMatchmaking.enabled || this._disposed) return;
             const delay = CONFIG.autoMatchmaking.delayMs;
             log(`Will start matchmaking in ${delay}ms`);
             this._autoMatchmakingTimer = setTimeout(() => this.tryStartMatchmaking(), delay);
         }
 
         cancelAutoMatchmaking() {
+            this._matchmakingRevision++;
             if (this._autoMatchmakingTimer) {
                 clearTimeout(this._autoMatchmakingTimer);
                 this._autoMatchmakingTimer = null;
@@ -325,6 +364,8 @@
                 log('No lobby data available');
                 return false;
             }
+            if (lobby.gameConfig?.queueId !== CONFIG.queueId || lobby.localMember?.isLeader !== true) return false;
+            if (lobby.canStartActivity === false) return false;
 
             const memberCount = lobby.members ? lobby.members.length : 0;
             const minMembers = CONFIG.autoMatchmaking.minimumMembers;
@@ -345,25 +386,23 @@
         }
 
         async tryStartMatchmaking() {
-            const canStart = await this.canStartMatchmaking();
-            if (canStart) {
-                this.startMatchmaking();
-                return;
-            }
-
-            log('Matchmaking conditions not met, rechecking every 3s');
-            this._lobbyCheckInterval = setInterval(async () => {
-                if (this._currentPhase !== 'Lobby') {
-                    this.cancelAutoMatchmaking();
-                    return;
-                }
+            if (this._matchmakingBusy) return;
+            const revision = this._matchmakingRevision;
+            const current = () => !this._disposed && CONFIG.autoMatchmaking.enabled &&
+                this._currentPhase === 'Lobby' && revision === this._matchmakingRevision;
+            if (!current()) return;
+            this._matchmakingBusy = true;
+            try {
                 const ready = await this.canStartMatchmaking();
+                if (!current()) return;
                 if (ready) {
-                    clearInterval(this._lobbyCheckInterval);
-                    this._lobbyCheckInterval = null;
-                    this.startMatchmaking();
+                    const phase = await lcuFetch('/lol-gameflow/v1/gameflow-phase');
+                    if (current() && phase === 'Lobby') await this.startMatchmaking();
+                } else {
+                    this._autoMatchmakingTimer = setTimeout(() => this.tryStartMatchmaking(), 3000);
                 }
-            }, 3000);
+            } catch (error) { log('Lobby check failed:', error.message); }
+            finally { this._matchmakingBusy = false; }
         }
 
         async startMatchmaking() {
@@ -375,50 +414,49 @@
             }
         }
 
-        async scheduleAutoHonor() {
+        scheduleAutoHonor() {
             if (!CONFIG.autoHonor.enabled) return;
-            await new Promise((r) => setTimeout(r, 1500));
-            this.honorPlayer();
+            const revision = this._actionRevision;
+            this._autoHonorTimer = setTimeout(() => this.honorPlayer(revision), 1500);
         }
 
-        async honorPlayer() {
+        async honorPlayer(revision = this._actionRevision) {
+            if (this._honoring) return;
+            this._honoring = true;
             try {
                 const ballot = await lcuFetch('/lol-honor-v2/v1/ballot');
-                if (!ballot || !ballot.eligibleAllies || ballot.eligibleAllies.length === 0) {
-                    log('No eligible allies, submitting empty ballot');
-                    await lcuFetch('/lol-honor-v2/v1/honor-player', 'POST', {
-                        honorCategory: 'HEART',
-                        summonerId: 0,
-                    });
-                    return;
-                }
-                const nonBots = ballot.eligibleAllies.filter((a) => !a.botPlayer);
-                if (nonBots.length === 0) {
-                    log('All allies are bots, skipping');
-                    await lcuFetch('/lol-honor-v2/v1/honor-player', 'POST', {
-                        honorCategory: 'HEART',
-                        summonerId: 0,
-                    });
-                    return;
-                }
-                const target = nonBots[Math.floor(Math.random() * nonBots.length)];
-                log(`Honoring: ${target.summonerName || target.summonerId}`);
+                if (!ballot?.gameId || !Array.isArray(ballot.eligibleAllies)) return;
+                if (ballot.votePool && ballot.votePool.votes <= 0) return;
+                this._honoredGames ||= new Set();
+                if (this._honoredGames.has(String(ballot.gameId))) return;
+                const alreadyHonored = new Set((ballot.honoredPlayers || []).map((player) => player.recipientPuuid));
+                const candidates = ballot.eligibleAllies.filter((player) =>
+                    !player.botPlayer && player.puuid && player.summonerId && !alreadyHonored.has(player.puuid));
+                if (!candidates.length) return;
+                const target = candidates[Math.floor(Math.random() * candidates.length)];
+                if (!await this.canRunAction(revision, 'autoHonor', ['PreEndOfGame'])) return;
+                // Verified against the client's /Help definition; honorCategory is not an accepted field.
                 await lcuFetch('/lol-honor-v2/v1/honor-player', 'POST', {
-                    honorCategory: 'HEART',
+                    honorType: 'HEART',
+                    gameId: ballot.gameId,
                     summonerId: target.summonerId,
+                    puuid: target.puuid,
                 });
+                this._honoredGames.add(String(ballot.gameId));
+                if (this._honoredGames.size > 100) this._honoredGames.delete(this._honoredGames.values().next().value);
                 log('Honor submitted!');
             } catch (e) {
                 log('Honor failed:', e.message);
-            }
+            } finally { this._honoring = false; }
         }
 
         scheduleAutoPlayAgain(phase) {
-            if (!CONFIG.autoPlayAgain.enabled) return;
             this.cancelAutoPlayAgain();
+            if (!CONFIG.autoPlayAgain.enabled || this._disposed) return;
             const delay = phase === 'WaitingForStats' ? Math.max(CONFIG.autoPlayAgain.delayMs, 5000) : CONFIG.autoPlayAgain.delayMs;
             log(`Will play again in ${delay}ms (phase: ${phase})`);
-            this._autoPlayAgainTimer = setTimeout(() => this.playAgain(), delay);
+            const revision = this._actionRevision;
+            this._autoPlayAgainTimer = setTimeout(() => this.playAgain(revision), delay);
         }
 
         cancelAutoPlayAgain() {
@@ -428,8 +466,9 @@
             }
         }
 
-        async playAgain() {
+        async playAgain(revision = this._actionRevision) {
             try {
+                if (!await this.canRunAction(revision, 'autoPlayAgain', ['EndOfGame', 'WaitingForStats'])) return;
                 await lcuFetch('/lol-lobby/v2/play-again', 'POST');
                 log('Play again!');
             } catch (e) {
@@ -438,35 +477,47 @@
         }
 
         async createRankedLobby() {
+            if (this._creatingLobby || this._disposed) return;
+            this._creatingLobby = true;
             try {
                 log(`Creating ranked lobby (queueId: ${CONFIG.queueId})`);
                 await lcuFetch('/lol-lobby/v2/lobby', 'POST', { queueId: CONFIG.queueId });
                 log('Ranked lobby created!');
             } catch (e) {
                 log('Lobby creation failed:', e.message);
-            }
+            } finally { this._creatingLobby = false; }
         }
 
+        ownsPlayButton() { return !this._disposed && CONFIG.instantRankedLobby.enabled; }
+
         handlePlayButton(btn) {
-            btn.addEventListener('click', (e) => {
-                if (!CONFIG.instantRankedLobby.enabled) return;
+            if (this._buttonHandlers.has(btn)) return;
+            const handler = (e) => {
+                if (!this.ownsPlayButton()) return;
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
                 this.createRankedLobby();
-            }, true);
+            };
+            btn.addEventListener('click', handler, true);
+            this._buttonHandlers.set(btn, handler);
             log('Play button intercepted');
         }
 
         observeDOM() {
             const check = (root) => {
                 if (!root || !root.querySelectorAll) return;
-                const btns = root.querySelectorAll('.play-button-content');
+                const btns = [...root.querySelectorAll('.play-button-content')];
+                if (root.matches?.('.play-button-content')) btns.push(root);
                 btns.forEach((btn) => {
-                    if (btn.dataset.soloqMachineAdded) return;
-                    btn.dataset.soloqMachineAdded = 'true';
                     this.handlePlayButton(btn);
                 });
+                for (const [button, handler] of this._buttonHandlers) {
+                    if (!button.isConnected) {
+                        button.removeEventListener('click', handler, true);
+                        this._buttonHandlers.delete(button);
+                    }
+                }
 
                 this.applyRankedOnlyFilters(root);
             };
@@ -565,6 +616,7 @@
         }
 
         openSettings() {
+            if (this._disposed) return;
             if (this._settingsPanel) this._settingsPanel.remove();
             this._settingsOpen = true;
             this._settingsPanel = this.buildSettingsPanel();
@@ -575,11 +627,12 @@
         closeSettings() {
             this._settingsOpen = false;
             if (this._settingsPanel) {
+                const panel = this._settingsPanel;
                 this._settingsPanel.style.opacity = '0';
                 this._settingsPanel.style.transform = 'translateY(10px)';
                 setTimeout(() => {
-                    if (this._settingsPanel) {
-                        this._settingsPanel.remove();
+                    panel.remove();
+                    if (this._settingsPanel === panel) {
                         this._settingsPanel = null;
                     }
                 }, 200);
@@ -811,6 +864,7 @@
                 e.stopPropagation();
                 CONFIG = structuredClone(DEFAULT_CONFIG);
                 saveConfig(CONFIG);
+                this.recheckCurrentPhase();
                 this.injectHideStyles();
                 this.closeSettings();
                 setTimeout(() => this.openSettings(), 250);

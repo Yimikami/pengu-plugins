@@ -2,7 +2,7 @@
  * @name         IconSwapper
  * @author       Yimikami
  * @description  Allows changing your summoner icon to any icon and uploading local icons for custom use clientside.
- * @version      0.1.0
+ * @version      0.1.1
  */
 
 (() => {
@@ -212,32 +212,17 @@
     });
   }
 
-  function freezeProperties(object, properties) {
-    if (!object) return;
-    for (const type in object) {
-      if (
-        (properties && properties.length && properties.includes(type)) ||
-        !properties ||
-        !properties.length
-      ) {
-        let value = object[type];
-        try {
-          Object.defineProperty(object, type, {
-            configurable: false,
-            get: () => value,
-            set: (v) => v,
-          });
-        } catch {}
-      }
-    }
-  }
-
   class IconSwapper {
     constructor() {
       debug("Initializing Icon Swapper plugin");
       this.summonerId = null;
       this.puuid = null;
       this.observer = null;
+      this.shadowObservers = new Map();
+      this.shadowStyles = new Map();
+      this._applyRevision = 0;
+      this.disposed = false;
+      window.addEventListener("unload", () => { this.disposed = true; this.revertIcon(); });
       this.init();
     }
 
@@ -253,20 +238,20 @@
         });
         debug("Added command bar action");
 
-        // Fetch current summoner data once
-        try {
-          debug("Fetching current summoner data");
-          const res = await fetch("/lol-summoner/v1/current-summoner");
-          const data = await res.json();
-          this.summonerId = data.summonerId;
-          this.puuid = data.puuid;
-          debug(
-            `Fetched summoner ID: ${this.summonerId}, PUUID: ${this.puuid}`
-          );
-        } catch (e) {
-          console.error("Icon Swapper: Error fetching summoner data.", e);
-          debug("Error fetching summoner data:", e);
+        for (let attempt = 0; attempt < 20 && !this.disposed; attempt++) {
+          try {
+            const res = await fetch("/lol-summoner/v1/current-summoner");
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (!data.summonerId || !data.puuid) throw new Error("Account is not ready");
+            this.summonerId = data.summonerId;
+            this.puuid = data.puuid;
+            break;
+          } catch {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
         }
+        if (this.disposed || !this.summonerId) return;
 
         // Apply the saved icon on load
         this.applyCustomIcon();
@@ -279,6 +264,12 @@
 
     revertIcon() {
       debug("Reverting icon changes");
+      this._applyRevision++;
+      clearTimeout(this._refreshTimer);
+      for (const observer of this.shadowObservers.values()) observer.disconnect();
+      this.shadowObservers.clear();
+      for (const style of this.shadowStyles.values()) style.remove();
+      this.shadowStyles.clear();
       if (this.observer) {
         this.observer.disconnect();
         this.observer = null;
@@ -294,6 +285,7 @@
     async applyCustomIcon() {
       debug("Applying custom icon");
       this.revertIcon();
+      const revision = this._applyRevision;
       const selectedIconId = await window.DataStore.get(CONFIG.DATASTORE_KEY);
       const customIconData = await window.DataStore.get(CONFIG.CUSTOM_ICON_KEY);
       debug(
@@ -302,6 +294,7 @@
         }`
       );
 
+      if (this.disposed || revision !== this._applyRevision || !this.summonerId) return;
       if (!selectedIconId && !customIconData) {
         debug(
           "No icon selected or summoner ID not available, skipping application"
@@ -320,8 +313,8 @@
 
       const style = document.createElement("style");
       style.id = CONFIG.STYLE_ID;
-      style.innerHTML = `
-        :root { --custom-avatar: url("${iconUrl}"); }
+      style.textContent = `
+        :root { --custom-avatar: url(${JSON.stringify(iconUrl)}); }
         .top > .icon-image.has-icon, summoner-icon {
           content: var(--custom-avatar) !important;
         }
@@ -340,67 +333,70 @@
     }
 
     observeDOM() {
-      debug("Setting up DOM observer");
-
-      const updateAndFreezeIcon = (element) => {
-        // Handle elements with shadow roots (like hovercards)
-        const iconElement = element.shadowRoot
-          ?.querySelector("lol-regalia-crest-v2-element")
-          ?.shadowRoot?.querySelector(".lol-regalia-summoner-icon");
-        if (iconElement) {
-          iconElement.style.backgroundImage = "var(--custom-avatar)";
-          freezeProperties(iconElement.style, ["backgroundImage"]);
-          debug("Updated and froze icon element in shadow root");
-          return;
-        }
-
-        // Handle direct crest elements
-        if (element.tagName === "LOL-REGALIA-CREST-V2-ELEMENT") {
-          const crestIcon = element.shadowRoot?.querySelector(
-            ".lol-regalia-summoner-icon"
-          );
-          if (crestIcon) {
-            crestIcon.style.backgroundImage = "var(--custom-avatar)";
-            freezeProperties(crestIcon.style, ["backgroundImage"]);
-            debug("Updated and froze direct crest element");
-          }
-        }
-      };
-
-      const selectors = [
+      const selector = [
         `lol-regalia-hovercard-v2-element[summoner-id="${this.summonerId}"]`,
         `lol-regalia-profile-v2-element[summoner-id="${this.summonerId}"]`,
         `lol-regalia-parties-v2-element[summoner-id="${this.summonerId}"]`,
         `lol-regalia-crest-v2-element[voice-puuid="${this.puuid}"]`,
-      ];
-      const combinedSelector = selectors.join(", ");
-      debug(`Using selectors: ${combinedSelector}`);
-
-      this.observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          for (const node of mutation.addedNodes) {
-            if (node instanceof Element) {
-              if (node.matches(combinedSelector)) {
-                debug("Found matching element, updating icon");
-                updateAndFreezeIcon(node);
-              }
-              const matchingElements = node.querySelectorAll(combinedSelector);
-              if (matchingElements.length > 0) {
-                debug(
-                  `Found ${matchingElements.length} matching child elements`
-                );
-                matchingElements.forEach(updateAndFreezeIcon);
-              }
-            }
+      ].join(",");
+      const schedule = () => {
+        clearTimeout(this._refreshTimer);
+        this._refreshTimer = setTimeout(refresh, 50);
+      };
+      let activeRoots;
+      const visit = (root) => {
+        activeRoots.add(root);
+        if (!this.shadowObservers.has(root)) {
+          const observer = new MutationObserver(schedule);
+          observer.observe(root, { childList: true, subtree: true });
+          this.shadowObservers.set(root, observer);
+        }
+        if (!this.shadowStyles.has(root)) {
+          const style = document.createElement("style");
+          style.textContent = ".lol-regalia-summoner-icon { background-image: var(--custom-avatar) !important; }";
+          this.shadowStyles.set(root, style);
+          root.appendChild(style);
+        }
+        root.querySelectorAll("lol-regalia-crest-v2-element").forEach((crest) => {
+          if (crest.shadowRoot) visit(crest.shadowRoot);
+        });
+      };
+      const refresh = () => {
+        activeRoots = new Set();
+        document.querySelectorAll(selector).forEach((element) => {
+          if (element.shadowRoot) visit(element.shadowRoot);
+        });
+        for (const [root, observer] of this.shadowObservers) {
+          if (!activeRoots.has(root)) {
+            observer.disconnect();
+            this.shadowObservers.delete(root);
+            this.shadowStyles.get(root)?.remove();
+            this.shadowStyles.delete(root);
           }
         }
+      };
+      this.observer = new MutationObserver(schedule);
+      this.observer.observe(document.body, {
+        childList: true, subtree: true, attributes: true,
+        attributeFilter: ["summoner-id", "voice-puuid"],
       });
+      refresh();
+    }
 
-      this.observer.observe(document.body, { childList: true, subtree: true });
-      const existingElements = document.querySelectorAll(combinedSelector);
-      debug(`Found ${existingElements.length} existing elements to update`);
-      existingElements.forEach(updateAndFreezeIcon);
-      debug("DOM observer setup completed");
+    async loadIconCatalog() {
+      if (this._catalog && Date.now() < this._catalog.expires) return this._catalog.icons;
+      if (!this._catalogRequest) {
+        this._catalogRequest = (async () => {
+          const response = await fetch(CONFIG.API_URL);
+          if (!response.ok) throw new Error(`Icon catalog HTTP ${response.status}`);
+          const icons = await response.json();
+          if (!Array.isArray(icons)) throw new Error("Invalid icon catalog");
+          const sorted = icons.filter((icon) => Number.isInteger(icon.id) && icon.id >= 0).sort((a, b) => b.id - a.id);
+          this._catalog = { icons: sorted, expires: Date.now() + 30 * 60 * 1000 };
+          return sorted;
+        })().finally(() => { this._catalogRequest = null; });
+      }
+      return this._catalogRequest;
     }
 
     async showIconModal() {
@@ -581,8 +577,7 @@
         await window.DataStore.set(CONFIG.CUSTOM_ICON_KEY, null);
         this.revertIcon();
         modal.remove();
-        debug("Restarting client to apply changes");
-        fetch("/riotclient/kill-and-restart-ux", { method: "POST" });
+        window.Toast.success("Original icon restored.");
       };
 
       const tabLeague = content.querySelector("#tab-league");
@@ -775,7 +770,7 @@
         updateSearchInfo(searchTerm, filtered.length, allValidIcons.length);
       }
       
-      function displayIcons(iconsToShow) {
+      function displayIcons(iconsToShow, page = 0) {
         grid.innerHTML = "";
         
         if (iconsToShow.length === 0) {
@@ -783,11 +778,17 @@
           return;
         }
         
-        iconsToShow.forEach((icon, index) => {
-          const img = icon.element.cloneNode(true);
-          img.style.opacity = "0";
-          img.style.transform = "scale(0.8)";
-          img.style.transition = "all 0.3s ease";
+        const pageSize = 96;
+        iconsToShow.slice(page * pageSize, (page + 1) * pageSize).forEach((icon) => {
+          const img = document.createElement("img");
+          img.loading = "lazy";
+          img.decoding = "async";
+          img.width = img.height = 100;
+          img.title = `ID: ${icon.id}`;
+          img.alt = `Icon ${icon.id}`;
+          img.style.cssText = "width:100px;height:100px;border-radius:50%;cursor:pointer;object-fit:cover";
+          img.onerror = () => { img.remove(); };
+          img.src = `/lol-game-data/assets/v1/profile-icons/${icon.id}.jpg`;
           
           // Re-attach the click handler
           img.onclick = async () => {
@@ -802,11 +803,24 @@
           
           grid.appendChild(img);
           
-          setTimeout(() => {
-            img.style.opacity = "1";
-            img.style.transform = "scale(1)";
-          }, index * 20);
         });
+        const pages = Math.ceil(iconsToShow.length / pageSize);
+        if (pages > 1) {
+          const pager = document.createElement("div");
+          pager.style.cssText = "grid-column:1 / -1;display:flex;gap:16px;justify-content:center;align-items:center;color:#cdbe91";
+          const label = document.createElement("span");
+          label.textContent = `${page + 1} / ${pages}`;
+          const previous = document.createElement("button");
+          previous.textContent = "Previous";
+          previous.disabled = page === 0;
+          previous.onclick = () => displayIcons(iconsToShow, page - 1);
+          const next = document.createElement("button");
+          next.textContent = "Next";
+          next.disabled = page + 1 === pages;
+          next.onclick = () => displayIcons(iconsToShow, page + 1);
+          pager.append(previous, label, next);
+          grid.appendChild(pager);
+        }
       }
       
       function updateSearchInfo(searchTerm, filteredCount, totalCount) {
@@ -840,67 +854,9 @@
       });
       
       try {
-        debug("Fetching icons from API");
-        const response = await fetch(CONFIG.API_URL);
-        const icons = await response.json();
-        debug(`Fetched ${icons.length} icons from API`);
-        grid.innerHTML = "";
-
-        const validIcons = [];
-        const iconPromises = icons
-          .sort((a, b) => b.id - a.id)
-          .filter((icon) => icon.id !== -1)
-          .map((icon) => {
-            return new Promise((resolve) => {
-              const img = new Image();
-              img.onload = () => {
-                debug(`Icon ${icon.id} loaded successfully`);
-                validIcons.push({ ...icon, element: img });
-                resolve();
-              };
-              img.onerror = () => {
-                debug(`Icon ${icon.id} failed to load`);
-                resolve();
-              };
-              img.src = `/lol-game-data/assets/v1/profile-icons/${icon.id}.jpg`;
-              img.title = `ID: ${icon.id}`;
-              img.style.cssText =
-                "width: 100px; height: 100px; border-radius: 50%; cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.3);";
-              img.onmouseover = () => {
-                img.style.transform = "scale(1.05)";
-                img.style.borderColor = "#c89b3c";
-                img.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
-              };
-              img.onmouseout = () => {
-                img.style.transform = "scale(1)";
-                img.style.borderColor = "transparent";
-                img.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
-              };
-
-              img.onclick = async () => {
-                debug(`Icon clicked: ID ${icon.id}`);
-                await window.DataStore.set(CONFIG.DATASTORE_KEY, icon.id);
-                await window.DataStore.set(CONFIG.CUSTOM_ICON_KEY, null);
-                window.Toast.success(`Icon changed to ID ${icon.id}!`);
-                await this.applyCustomIcon();
-                modal.remove();
-                debug("Icon selection completed");
-              };
-            });
-          });
-
-        await Promise.all(iconPromises);
-
-        allValidIcons = validIcons.slice(); // Store all valid icons for searching
-        displayIcons(allValidIcons);
-        updateSearchInfo("", allValidIcons.length, allValidIcons.length);
-
-        debug(`Icon grid populated with ${validIcons.length} valid icons`);
-
-        if (validIcons.length === 0) {
-          grid.innerHTML =
-            '<div style="grid-column: 1 / -1; text-align: center; margin: 40px 20px;"><p style="color: #e63946; font-size: 16px; margin: 0;">No valid icons found. Please try again later.</p></div>';
-        }
+        allValidIcons = await this.loadIconCatalog();
+        if (!modal.isConnected) return;
+        filterIcons(searchInput.value.trim());
       } catch (error) {
         grid.innerHTML =
           '<p style="color: #e63946;">Failed to load icons. Please try again later.</p>';

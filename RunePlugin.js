@@ -3,10 +3,10 @@
  * @author Yimikami
  * @description Fetches optimal runes and item sets based on U.GG and Lolalytics data
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.4
+ * @version 0.0.6
  */
 
-import { settingsUtils } from "https://unpkg.com/blank-settings-utils@latest/Settings-Utils.js";
+import { settingsUtils } from "https://unpkg.com/blank-settings-utils@1.0.0/Settings-Utils.js";
 
 let data = [
   {
@@ -65,7 +65,7 @@ const DEFAULT_CONFIG = {
 };
 
 // Configuration that will be loaded from DataStore
-let CONFIG = { ...DEFAULT_CONFIG };
+let CONFIG = structuredClone(DEFAULT_CONFIG);
 
 // DataStore functions
 const SettingsStore = {
@@ -164,18 +164,23 @@ const utils = {
   },
 
   async fetchWithRetry(url, options = {}, retries = CONFIG.retryAttempts) {
-    try {
-      const response = await fetch(url, options);
-      if (!response.ok)
+    // Retry reads only: a lost write response does not mean the write failed.
+    const attempts = (options.method || "GET") === "GET" ? retries + 1 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      let retryable = true;
+      try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        if (response.ok) return response;
+        retryable = response.status === 429 || response.status >= 500;
         throw new Error(`HTTP error! status: ${response.status}`);
-      return response;
-    } catch (error) {
-      if (retries > 0) {
-        utils.debugLog(`Retrying request... Attempts left: ${retries}`);
-        await new Promise((resolve) => setTimeout(resolve, CONFIG.retryDelay));
-        return this.fetchWithRetry(url, options, retries - 1);
+      } catch (error) {
+        if (!retryable || attempt === attempts - 1) throw error;
+      } finally {
+        clearTimeout(timeout);
       }
-      throw error;
+      await new Promise((resolve) => setTimeout(resolve, CONFIG.retryDelay * (attempt + 1)));
     }
   },
 
@@ -244,6 +249,15 @@ const utils = {
     }
   },
 
+  async updatePage(id, page) {
+    const response = await this.fetchWithRetry(`${CONFIG.endpoints.perksPage}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...page, id }),
+    });
+    return response.status === 204 ? { ...page, id } : response.json();
+  },
+
   getRuneTree(runeId) {
     return RUNE_TREES[runeId] || Math.floor(runeId / 100) * 100;
   },
@@ -268,6 +282,10 @@ class LolalyticsRunePlugin {
     this.sessionObserver = null;
     this.version = null;
     this.currentGameMode = null;
+    this._selection = null;
+    this._pendingSelection = null;
+    this._processing = null;
+    this._disposed = false;
     utils.debugLog("Plugin instance created");
   }
 
@@ -275,6 +293,13 @@ class LolalyticsRunePlugin {
     try {
       utils.debugLog("Initializing plugin...");
       await SettingsStore.loadSettings();
+      this.initializeSettings();
+      this.setupCleanup();
+      window.CommandBar?.addAction({
+        name: "Restore backed-up rune page",
+        group: "Rune Plugin",
+        perform: () => this.restoreRunePage(),
+      });
       await this.waitForClientInit();
 
       const versions = await utils.fetchJson(CONFIG.endpoints.versions);
@@ -287,8 +312,6 @@ class LolalyticsRunePlugin {
           championCount: Object.keys(this.championData).length / 2,
         });
         await this.setupChampSelectSubscription(context.socket);
-        this.setupCleanup();
-        this.initializeSettings();
         utils.debugLog("Plugin initialization completed");
       } else {
         utils.debugLog("Failed to load champion data", null, "error");
@@ -299,9 +322,16 @@ class LolalyticsRunePlugin {
   }
 
   initializeSettings() {
+    if (!document.body) {
+      document.addEventListener("DOMContentLoaded", () => {
+        if (!this._disposed) this.initializeSettings();
+      }, { once: true });
+      return;
+    }
     const addSettings = () => {
       const settingsContainer = document.querySelector(".rune-plugin-settings");
-      if (!settingsContainer) return;
+      if (!settingsContainer || settingsContainer.dataset.penguSettingsReady) return;
+        settingsContainer.dataset.penguSettingsReady = "true";
 
       settingsContainer.innerHTML = `
         <div class="lol-settings-general-row">
@@ -427,10 +457,10 @@ class LolalyticsRunePlugin {
     };
 
     // Observe for settings container
-    const observer = new MutationObserver((mutations) => {
+    const observer = this.settingsObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
-          if (node.classList?.contains("rune-plugin-settings")) {
+          if (node.nodeType === 1 && (node.matches(".rune-plugin-settings") || node.querySelector(".rune-plugin-settings"))) {
             addSettings();
             return;
           }
@@ -442,6 +472,7 @@ class LolalyticsRunePlugin {
       childList: true,
       subtree: true,
     });
+      addSettings();
   }
 
   handleProviderChange(newProvider) {
@@ -456,6 +487,7 @@ class LolalyticsRunePlugin {
       );
       SettingsStore.saveSettings();
       this.lastAppliedRunes = null;
+      this.refreshSelection();
     }
   }
 
@@ -465,18 +497,21 @@ class LolalyticsRunePlugin {
     Toast.success(`Item sets ${enabled ? "enabled" : "disabled"}`);
     SettingsStore.saveSettings();
     this.lastAppliedItemSet = null;
+    this.refreshSelection();
+  }
+
+  refreshSelection() {
+    if (this._lastEvent) void this.handleChampSelectUpdate(this._lastEvent);
   }
 
   async waitForClientInit() {
     const maxAttempts = 20;
-    let attempts = 0;
-
-    while (attempts < maxAttempts) {
+    for (let attempts = 0; attempts < maxAttempts && !this._disposed; attempts++) {
       try {
-        const response = await fetch(CONFIG.endpoints.championSummary);
-        if (response.ok) return;
-      } catch (error) {
-        attempts++;
+        await utils.fetchWithRetry(CONFIG.endpoints.championSummary, {}, 0);
+        return;
+      } catch {
+        if (attempts === maxAttempts - 1) break;
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
@@ -488,9 +523,12 @@ class LolalyticsRunePlugin {
     if (!socket) return;
 
     try {
+      let phaseEvents = 0;
       const phaseObserver = socket.observe(
         CONFIG.endpoints.gamePhase,
         async (phase) => {
+          phaseEvents++;
+          if (this._disposed) return;
           if (phase.data === "ChampSelect") {
             this.startChampSelectSession(socket);
           } else if (this.isChampSelectSessionActive()) {
@@ -501,9 +539,9 @@ class LolalyticsRunePlugin {
       this.observers.push(phaseObserver);
 
       const response = await fetch(CONFIG.endpoints.gamePhase);
-      if (response.ok) {
-        const phase = await response.text();
-        if (phase.data === "ChampSelect") {
+      if (response.ok && phaseEvents === 0 && !this._disposed) {
+        const phase = await response.json();
+        if (phase === "ChampSelect") {
           this.startChampSelectSession(socket);
         }
       }
@@ -517,16 +555,26 @@ class LolalyticsRunePlugin {
   }
 
   startChampSelectSession(socket) {
-    if (this.isChampSelectSessionActive()) return;
+    if (this._disposed || this.isChampSelectSessionActive()) return;
+    this._sessionPaused = false;
 
     this.sessionObserver = socket.observe(
       CONFIG.endpoints.champSelect,
       this.handleChampSelectUpdate.bind(this)
     );
     this.observers.push(this.sessionObserver);
+    const observer = this.sessionObserver;
+    void utils.fetchJson(CONFIG.endpoints.champSelect).then((data) => {
+      if (this.sessionObserver === observer && !this._lastEvent) {
+        return this.handleChampSelectUpdate({ data });
+      }
+    }).catch((error) => utils.debugLog("Cannot read current selection", error));
   }
 
   stopChampSelectSession() {
+    this._selection = this._pendingSelection = this._lastEvent = null;
+    this.currentGameMode = null;
+    this.lastAppliedItemSet = null;
     if (!this.isChampSelectSessionActive()) return;
 
     const index = this.observers.indexOf(this.sessionObserver);
@@ -541,6 +589,9 @@ class LolalyticsRunePlugin {
   }
 
   cleanup() {
+    this._disposed = true;
+    this._selection = this._pendingSelection = null;
+    this.settingsObserver?.disconnect();
     if (this.isChampSelectSessionActive()) {
       this.stopChampSelectSession();
     }
@@ -556,37 +607,53 @@ class LolalyticsRunePlugin {
   }
 
   async handleChampSelectUpdate(event) {
-    if (!event?.data?.myTeam) return;
-
-    const myPlayer = event.data.myTeam.find(
+    if (this._disposed || this._sessionPaused) return;
+    const myPlayer = event?.data?.myTeam?.find(
       (player) => player.cellId === event.data.localPlayerCellId
     );
-
-    if (!myPlayer?.championId) return;
-
-    const position = myPlayer.assignedPosition?.toLowerCase() || "";
-
-    // Check if we're in Arena mode
-    await this.checkGameMode();
-    
-    // Handle runes (skip for Arena mode)
-    if (this.currentGameMode !== "CHERRY" && !this.shouldSkipRuneUpdate(myPlayer.championId, position)) {
-      await this.createRunesForChampion(myPlayer.championId, position);
+    this._lastEvent = event;
+    if (!myPlayer?.championId) {
+      this._selection = this._pendingSelection = null;
+      return;
     }
+    const position = myPlayer.assignedPosition?.toLowerCase() || "";
+    const key = `${myPlayer.championId}:${position}:${CONFIG.selectedProvider}:${CONFIG.itemSets.enabled}`;
+    if (this._selection?.key === key) return this._processing;
+    const selection = { key, championId: myPlayer.championId, position };
+    this._selection = this._pendingSelection = selection;
+    if (!this._processing) {
+      this._processing = this.processSelections().finally(() => { this._processing = null; });
+    }
+    return this._processing;
+  }
 
-    // Handle item sets
-    if (
-      CONFIG.itemSets.enabled &&
-      !this.shouldSkipItemSetUpdate(myPlayer.championId, position)
-    ) {
-      await this.createItemSetForChampion(myPlayer.championId, position);
+  async processSelections() {
+    while (this._pendingSelection && !this._disposed) {
+      const selection = this._pendingSelection;
+      this._pendingSelection = null;
+      const current = () => !this._disposed && this._selection === selection;
+      try {
+        if (!this.currentGameMode) await this.checkGameMode(current);
+        if (!current()) continue;
+        if (this.currentGameMode !== "CHERRY") {
+          await this.createRunesForChampion(selection.championId, selection.position, current);
+        }
+        if (current() && CONFIG.itemSets.enabled) {
+          await this.createItemSetForChampion(selection.championId, selection.position, current);
+        }
+      } catch (error) {
+        if (current()) {
+          console.error("[RunePlugin] Selection update failed:", error);
+          window.Toast?.error?.(`Rune Plugin: ${error.message}`);
+        }
+      }
     }
   }
 
-  async checkGameMode() {
+  async checkGameMode(current = () => true) {
     try {
       const gameflowSession = await utils.fetchJson(CONFIG.endpoints.gameflowSession);
-      if (gameflowSession?.gameData?.queue?.gameMode) {
+      if (current() && gameflowSession?.gameData?.queue?.gameMode) {
         this.currentGameMode = gameflowSession.gameData.queue.gameMode;
         utils.debugLog(`Current game mode: ${this.currentGameMode}`);
       }
@@ -604,19 +671,23 @@ class LolalyticsRunePlugin {
     );
   }
 
-  async createRunesForChampion(championId, position) {
+  async createRunesForChampion(championId, position, current = () => true) {
     this.isCreatingRunes = true;
     try {
       const runeData = await this.getRunesForChampion(championId, position);
+      if (!current()) return;
       if (runeData) {
-        await this.createRunePage(
+        const saved = await this.createRunePage(
           championId,
           runeData.selectedPerkIds,
           runeData.displayPosition,
           runeData.mainPerk,
-          runeData.subPerk
+          runeData.subPerk,
+          current
         );
-        this.lastAppliedRunes = { championId, position };
+        if (saved && current()) this.lastAppliedRunes = { championId, position };
+      } else {
+        throw new Error("The selected rune provider returned no usable data");
       }
     } finally {
       this.isCreatingRunes = false;
@@ -629,9 +700,16 @@ class LolalyticsRunePlugin {
       position,
       provider: CONFIG.selectedProvider,
     });
-    return CONFIG.selectedProvider === PROVIDERS.UGG
-      ? await this.getUGGRunes(championId, position)
-      : await this.getLolalyticsRunes(championId, position);
+    if (CONFIG.selectedProvider === PROVIDERS.UGG) {
+      const data = await this.getUGGRunes(championId, position);
+      if (data) return { ...data, provider: PROVIDERS.UGG };
+      if (!this._warnedUGG) {
+        this._warnedUGG = true;
+        window.Toast?.error?.("U.GG is unavailable. Trying Lolalytics for runes.");
+      }
+    }
+    const data = await this.getLolalyticsRunes(championId, position);
+    return data ? { ...data, provider: PROVIDERS.LOLALYTICS } : null;
   }
 
   async getUGGRunes(championId, position) {
@@ -752,26 +830,91 @@ class LolalyticsRunePlugin {
     selectedPerkIds,
     position,
     mainPerk,
-    subPerk
+    subPerk,
+    current = () => true
   ) {
-    const pages = await utils.getPages();
-    if (!pages) return null;
-
-    if (pages.length >= 2) {
-      const currentPage = await utils.getCurrentPage();
-      await utils.deletePage(currentPage?.id || pages[0].id);
+    const styles = [8000, 8100, 8200, 8300, 8400];
+    if (!Array.isArray(selectedPerkIds) || selectedPerkIds.length !== 9 ||
+        !selectedPerkIds.every((id) => Number.isInteger(id) && id > 0) ||
+        !styles.includes(mainPerk) || !styles.includes(subPerk) || mainPerk === subPerk) {
+      throw new Error("Invalid rune data; existing pages were kept");
     }
-
-    const provider =
-      CONFIG.selectedProvider === PROVIDERS.UGG ? "U.GG" : "Lolalytics";
-    return await utils.createPage({
-      name: `${provider} - ${this.championData[championId]} ${position}`,
+    const summoner = await utils.fetchJson(CONFIG.endpoints.currentSummoner);
+    const pages = await utils.getPages();
+    if (!summoner?.summonerId || !Array.isArray(pages) || !current()) return null;
+    const storageKey = `rune-plugin-owned-page:${summoner.puuid || summoner.summonerId}`;
+    const ownedId = Number(DataStore.get(storageKey));
+    const isPluginPage = page => /^\[(?:R|RunePlugin)\] /.test(page.name || "");
+    const owned = pages.find((page) => page.id === ownedId && isPluginPage(page) && page.isEditable !== false);
+    const lane = { middle: "Mid", jungle: "Jg", support: "Sup", utility: "Sup", bottom: "ADC" }[position?.toLowerCase()] || position || "";
+    const page = {
+      name: `[R] ${this.championData[championId]} ${lane}`.trim().slice(0, 32),
       primaryStyleId: mainPerk,
       subStyleId: subPerk,
       selectedPerkIds,
       current: true,
       order: 0,
-    });
+    };
+    let target = owned;
+    if (!target) {
+      const inventory = await utils.fetchJson("/lol-perks/v1/inventory");
+      if (!current()) return null;
+      if (inventory.canAddCustomPage === false) {
+        const active = await utils.getCurrentPage();
+        target = pages.find((entry) => entry.id === active?.id && entry.isEditable === true) ||
+          pages.find((entry) => entry.isEditable === true);
+        if (!target) throw new Error("No editable rune page is available");
+        const backupKey = `rune-plugin-page-backup:${summoner.puuid || summoner.summonerId}`;
+        // Keep the first original until the user explicitly restores it.
+        const existingBackup = DataStore.get(backupKey);
+        if (existingBackup) {
+          const original = JSON.parse(existingBackup).page;
+          const unchanged = ["name", "primaryStyleId", "subStyleId", "selectedPerkIds"].every(
+            (key) => JSON.stringify(original[key]) === JSON.stringify(target[key]));
+          if (original.id !== target.id || (!unchanged && !isPluginPage(target))) {
+            throw new Error("Restore the previous rune-page backup before reusing another personal page");
+          }
+        } else {
+          const backup = JSON.stringify({ page: target, savedAt: Date.now() });
+          DataStore.set(backupKey, backup);
+          if (DataStore.get(backupKey) !== backup) throw new Error("Rune page backup could not be verified");
+        }
+      }
+    }
+    if (!current()) return null;
+    const saved = target ? await utils.updatePage(target.id, page) : await utils.createPage(page);
+    if (!saved?.id) throw new Error("Could not save the rune page; no pages were deleted");
+    DataStore.set(storageKey, String(saved.id));
+    return saved;
+  }
+
+  async restoreRunePage() {
+    if (this._restoring) return;
+    this._restoring = true;
+    this._sessionPaused = true;
+    this._selection = this._pendingSelection = null;
+    try {
+      await this._processing;
+      const summoner = await utils.fetchJson(CONFIG.endpoints.currentSummoner);
+      if (!summoner?.summonerId) throw new Error("The account is not ready");
+      const account = summoner.puuid || summoner.summonerId;
+      const backupKey = `rune-plugin-page-backup:${account}`;
+      const backup = DataStore.get(backupKey);
+      if (!backup) { window.Toast?.success?.("There is no rune page backup for this account."); return; }
+      const { page } = JSON.parse(backup);
+      const pages = await utils.getPages();
+      if (!pages?.some((entry) => entry.id === page.id && entry.isEditable === true)) {
+        throw new Error("The backed-up page no longer exists; the backup has been kept");
+      }
+      const { name, primaryStyleId, subStyleId, selectedPerkIds, order } = page;
+      await utils.updatePage(page.id, { name, primaryStyleId, subStyleId, selectedPerkIds, order, current: true });
+      DataStore.set(`rune-plugin-owned-page:${account}`, "");
+      DataStore.set(backupKey, "");
+      window.Toast?.success?.("Original rune page restored. Auto runes resume next champion select.");
+    } catch (error) {
+      console.error("[RunePlugin] Could not restore rune page:", error);
+      window.Toast?.error?.("Could not restore the rune page. The backup has been kept.");
+    } finally { this._restoring = false; }
   }
 
   async getLolalyticsRunes(championId, position) {
@@ -851,13 +994,13 @@ class LolalyticsRunePlugin {
     );
   }
 
-  async createItemSetForChampion(championId, position) {
+  async createItemSetForChampion(championId, position, current = () => true) {
     this.isCreatingItemSet = true;
     try {
       const itemSetData = await this.getItemSetData(championId, position);
-      if (itemSetData) {
-        await this.createItemSet(championId, itemSetData, position);
-        this.lastAppliedItemSet = { championId, position };
+      if (itemSetData && current()) {
+        const saved = await this.createItemSet(championId, itemSetData, position, current);
+        if (saved && current()) this.lastAppliedItemSet = { championId, position };
       }
     } finally {
       this.isCreatingItemSet = false;
@@ -1167,7 +1310,7 @@ class LolalyticsRunePlugin {
     };
   }
 
-  async createItemSet(championId, itemSets, position) {
+  async createItemSet(championId, itemSets, position, current = () => true) {
     try {
       const currentSummoner = await utils.fetchJson(
         CONFIG.endpoints.currentSummoner
@@ -1175,8 +1318,7 @@ class LolalyticsRunePlugin {
       if (!currentSummoner?.summonerId) return;
 
       const builds = this.processItemSets(itemSets);
-      const provider =
-        CONFIG.selectedProvider === PROVIDERS.UGG ? "U.GG" : "Lolalytics";
+      const provider = "Lolalytics"; // Item data always comes from Lolalytics.
       
       // Add Arena indicator to title if in Arena mode
       const modeIndicator = this.currentGameMode === "CHERRY" ? " Arena" : "";
@@ -1188,7 +1330,7 @@ class LolalyticsRunePlugin {
 
       // Create new item set
       const newItemSet = {
-        uid: crypto.randomUUID(),
+        uid: `rune-plugin:${championId}:${this.currentGameMode || "CLASSIC"}:${position || "auto"}`,
         title: `${provider}${modeIndicator} - ${
           this.championData[championId]
         } ${utils.getDisplayPosition(position)}`,
@@ -1245,11 +1387,12 @@ class LolalyticsRunePlugin {
         type: "custom",
       };
 
-      // Filter out old item sets with the same champion and provider
-      const oldItemSets = existingSets?.itemSets || [];
-      const filteredSets = oldItemSets.filter(
-        (set) => !set.title.includes("Lolalytics")
-      );
+      newItemSet.blocks = newItemSet.blocks.filter((block) => block.items.length &&
+        block.items.every((item) => /^\d+$/.test(item.id) && Number(item.id) > 0));
+      if (!newItemSet.blocks.length) throw new Error("No valid items in provider response");
+      if (!Array.isArray(existingSets?.itemSets)) throw new Error("Cannot safely read existing item sets");
+      const filteredSets = existingSets.itemSets.filter((set) => set.uid !== newItemSet.uid);
+      if (!current() || !CONFIG.itemSets.enabled) return false;
 
       utils.debugLog("Creating item set", { builds, newItemSet });
 
@@ -1273,8 +1416,10 @@ class LolalyticsRunePlugin {
       }
 
       utils.debugLog("Item set created successfully", newItemSet);
+      return true;
     } catch (error) {
       utils.debugLog("Error creating item set", error);
+      throw error;
     }
   }
 }

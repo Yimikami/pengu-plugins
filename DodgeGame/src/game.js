@@ -20,6 +20,7 @@ import {
 export class DodgeGame {
   constructor() {
     this.state = "idle";
+    this._loadGeneration = (this._loadGeneration || 0) + 1;
     this.highScore = 0;
     this.selectedChampionId = 81; // default Ezreal
     this.summonerName = "Summoner";
@@ -287,6 +288,8 @@ export class DodgeGame {
   }
 
   close() {
+    this._loadGeneration++;
+    clearTimeout(this._overTimer);
     if (!this.ui.overlay && !this._popupWin) return;
     this.stopLoop();
     if (this._input) this._input.detach();
@@ -314,17 +317,22 @@ export class DodgeGame {
   // ---- game start -------------------------------------------------------
   async startGame() {
     const champ = championById(this.selectedChampionId);
-    if (!champ) return;
-
+    if (!champ || this.state === "loading") return;
+    const generation = ++this._loadGeneration;
+    const current = () => generation === this._loadGeneration && !!this.ui.overlay;
+    this.disposeScene();
+    this.ui.removeHud();
     this.state = "loading";
     this.ui.renderLoading("Loading Three.js runtime", 5);
 
     try {
       this._three = await getThree();
+      if (!current()) return;
       this.ui.renderLoading(`Summoning ${champ.name}`, 15);
       const modelData = await loadChampionModel(champ, (pct) => {
-        this.ui.renderLoading(`Summoning ${champ.name}`, 15 + pct * 0.75);
+        if (current()) this.ui.renderLoading(`Summoning ${champ.name}`, 15 + pct * 0.75);
       });
+      if (!current()) return;
       this.ui.renderLoading("Building arena", 95);
 
       // Clean any previous scene (e.g., from rematch with a different champion)
@@ -365,7 +373,9 @@ export class DodgeGame {
       this._input.attach();
 
       const targetWin = this._win;
+      this._resizeWindow = targetWin;
       this._resizeHandler = () => {
+        if (!this._scene) return;
         const { renderer, camera } = this._scene;
         const w = targetWin.innerWidth, h = targetWin.innerHeight;
         renderer.setSize(w, h, false);
@@ -405,6 +415,8 @@ export class DodgeGame {
       this.savePersistent();
       this.startLoop();
     } catch (e) {
+      if (!current()) return;
+      this.disposeScene();
       console.error("[DodgeGame] failed to start:", e);
       this.ui.renderError(`${e?.message || e}`, () => this.ui.renderMenu({ highScore: this.highScore, selectedId: this.selectedChampionId }));
       this.state = "menu";
@@ -670,6 +682,7 @@ export class DodgeGame {
 
     clearTimeout(this._overTimer);
     this._overTimer = setTimeout(() => {
+      if (this.state !== "over" || !this.ui.overlay) return;
       this.ui.renderGameOver({
         stats: this.stats,
         highScore: this.highScore,
@@ -682,6 +695,14 @@ export class DodgeGame {
   // ---- teardown ---------------------------------------------------------
   disposeScene() {
     this.stopLoop();
+    clearTimeout(this._overTimer);
+    this._input?.detach();
+    this._input = null;
+    if (this._resizeHandler) {
+      (this._resizeWindow || this._win).removeEventListener("resize", this._resizeHandler);
+      this._resizeHandler = null;
+      this._resizeWindow = null;
+    }
     if (!this._scene) return;
     for (const p of this.projectiles) disposeProjectile(p, this._scene.scene);
     this.projectiles = [];

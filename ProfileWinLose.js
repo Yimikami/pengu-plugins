@@ -3,10 +3,10 @@
  * @author Yimikami
  * @description Shows summoner's win/loss statistics and win rate on their profile
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.3
+ * @version 0.0.4
  */
 
-import { settingsUtils } from "https://unpkg.com/blank-settings-utils@latest/Settings-Utils.js";
+import { settingsUtils } from "https://unpkg.com/blank-settings-utils@1.0.0/Settings-Utils.js";
 
 let data = [
   {
@@ -27,6 +27,8 @@ let data = [
   },
 ];
 
+export function init() { settingsUtils(window, data); }
+
 (() => {
   // Default configuration
   const DEFAULT_CONFIG = {
@@ -41,8 +43,6 @@ let data = [
     cacheExpiry: 5 * 60 * 1000, // 5 minutes
     selectedQueue: "all", // Default queue type, filters matches from the last "gamesCount" games
     kdaDisplay: "show", // KDA display option: "show", "hide"
-    seasonStartDate: new Date("2026-01-09T00:00:00Z").getTime(), // Season 16 start date
-    seasonFilter: "on", // Season filter option: "on", "off"
   };
 
   // Configuration that will be loaded from DataStore
@@ -75,8 +75,6 @@ let data = [
             selectedQueue:
               userSettings.selectedQueue ?? DEFAULT_CONFIG.selectedQueue,
             kdaDisplay: userSettings.kdaDisplay ?? DEFAULT_CONFIG.kdaDisplay,
-            seasonFilter:
-              userSettings.seasonFilter ?? DEFAULT_CONFIG.seasonFilter,
           };
           debugLog("Settings loaded from DataStore:", CONFIG);
         }
@@ -92,7 +90,6 @@ let data = [
           gamesCount: CONFIG.gamesCount,
           selectedQueue: CONFIG.selectedQueue,
           kdaDisplay: CONFIG.kdaDisplay,
-          seasonFilter: CONFIG.seasonFilter,
         };
         DataStore.set("profile-winloss-settings", JSON.stringify(settings));
         debugLog("Settings saved to DataStore:", settings);
@@ -113,10 +110,12 @@ let data = [
   const utils = {
     debounce(func, wait) {
       let timeout;
-      return (...args) => {
+      const run = (...args) => {
         clearTimeout(timeout);
         timeout = setTimeout(() => func(...args), wait);
       };
+      run.cancel = () => clearTimeout(timeout);
+      return run;
     },
 
     async retry(fn, retries = CONFIG.retryAttempts) {
@@ -148,6 +147,7 @@ let data = [
       this.lastCheckTime = 0;
       this.checkThrottle = 1000; // Check every 1 second instead of 2
       this.isCleanedUp = false;
+      this._statsRequestId = 0;
       this.init();
     }
 
@@ -158,21 +158,8 @@ let data = [
       this.injectStyles();
       this.initializeSettings();
 
-      // Initial check with a small delay to ensure DOM is ready
-      setTimeout(() => this.checkCurrentProfile(), 100);
-
-      // Use requestAnimationFrame for smoother performance
-      const tick = () => {
-        const now = Date.now();
-        if (now - this.lastCheckTime >= this.checkThrottle) {
-          this.lastCheckTime = now;
-          this.checkCurrentProfile();
-        }
-        if (!this.isCleanedUp) {
-          requestAnimationFrame(tick);
-        }
-      };
-      requestAnimationFrame(tick);
+      this.checkCurrentProfile();
+      this.profileCheckInterval = setInterval(() => this.checkCurrentProfile(), 2000);
     }
 
     initializeSettings() {
@@ -180,7 +167,8 @@ let data = [
         const settingsContainer = document.querySelector(
           ".profile-winloss-settings"
         );
-        if (!settingsContainer) return;
+        if (!settingsContainer || settingsContainer.dataset.penguSettingsReady) return;
+        settingsContainer.dataset.penguSettingsReady = "true";
 
         settingsContainer.innerHTML = `
           <div class="lol-settings-general-row">
@@ -207,21 +195,6 @@ let data = [
                   `
             )
             .join("")}
-                </lol-uikit-framed-dropdown>
-              </div>
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <p class="lol-settings-window-size-text">Season 15 Filter:</p>
-                <lol-uikit-framed-dropdown class="lol-settings-general-dropdown" style="width: 200px;" tabindex="0">
-                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${CONFIG.seasonFilter === "on"
-          }" value="on">
-                    On
-                    <div class="lol-tooltip-component"></div>
-                  </lol-uikit-dropdown-option>
-                  <lol-uikit-dropdown-option slot="lol-uikit-dropdown-option" class="framed-dropdown-type" selected="${CONFIG.seasonFilter === "off"
-          }" value="off">
-                    Off
-                    <div class="lol-tooltip-component"></div>
-                  </lol-uikit-dropdown-option>
                 </lol-uikit-framed-dropdown>
               </div>
               <div style="display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: thin solid #3c3c41;">
@@ -285,34 +258,10 @@ let data = [
           });
         });
 
-        // Season Filter dropdown
-        const seasonDropdown = settingsContainer.querySelectorAll(
-          "lol-uikit-framed-dropdown"
-        )[1];
-        const seasonOptions = seasonDropdown.querySelectorAll(
-          "lol-uikit-dropdown-option"
-        );
-
-        seasonOptions.forEach((option) => {
-          option.addEventListener("click", () => {
-            const value = option.getAttribute("value");
-            this.handleSeasonChange(value);
-
-            // Update selected state
-            seasonOptions.forEach((opt) => opt.removeAttribute("selected"));
-            option.setAttribute("selected", "");
-            seasonDropdown.setAttribute("selected-value", value);
-            seasonDropdown.setAttribute(
-              "selected-item",
-              value === "on" ? "On" : "Off"
-            );
-          });
-        });
-
         // KDA Display dropdown
         const kdaDropdown = settingsContainer.querySelectorAll(
           "lol-uikit-framed-dropdown"
-        )[2];
+        )[1];
         const kdaOptions = kdaDropdown.querySelectorAll(
           "lol-uikit-dropdown-option"
         );
@@ -340,10 +289,10 @@ let data = [
       };
 
       // Observe for settings container
-      const observer = new MutationObserver((mutations) => {
+      const observer = this.settingsObserver = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           for (const node of mutation.addedNodes) {
-            if (node.classList?.contains("profile-winloss-settings")) {
+            if (node.nodeType === 1 && (node.matches(".profile-winloss-settings") || node.querySelector(".profile-winloss-settings"))) {
               addSettings();
               return;
             }
@@ -355,6 +304,7 @@ let data = [
         childList: true,
         subtree: true,
       });
+      addSettings();
     }
 
     handleSettingsChange(e) {
@@ -396,26 +346,15 @@ let data = [
       }
     }
 
-    handleSeasonChange(newSeason) {
-      debugLog("Season 15 filter change triggered:", newSeason);
-      CONFIG.seasonFilter = newSeason;
-      cache.clear();
-      debugLog(`Season 15 filter updated to: ${newSeason}`);
-      Toast.success(
-        `Season 15 filter updated to: ${newSeason === "on" ? "On" : "Off"}`
-      );
-      SettingsStore.saveSettings();
-
-      if (this.currentSummonerId) {
-        this.updateStats(this.currentSummonerId);
-      }
-    }
-
     setupCleanup() {
       window.addEventListener("unload", () => {
         this.isCleanedUp = true;
         this.observer?.disconnect();
-        settingsObserver?.disconnect();
+        this.settingsObserver?.disconnect();
+        clearInterval(this.profileCheckInterval);
+        this._updateDebounced?.cancel();
+        this._statsRequestId++;
+        this.statsContainer?.remove();
         this.styleElement?.remove();
         this.processedProfiles.clear();
         cache.clear();
@@ -423,7 +362,7 @@ let data = [
     }
 
     observeProfile() {
-      const debouncedUpdate = utils.debounce(this.updateStats.bind(this), 250);
+      const debouncedUpdate = this._updateDebounced = utils.debounce(this.updateStats.bind(this), 250);
 
       this.observer = new MutationObserver(() => {
         const profileElements = document.querySelectorAll(
@@ -434,13 +373,21 @@ let data = [
         );
         const targetProfile = searchedProfile || profileElements[0];
 
-        if (!targetProfile) return;
+        if (!targetProfile) {
+          this.currentSummonerId = null;
+          this._statsRequestId++;
+          debouncedUpdate.cancel();
+          this.statsContainer?.remove();
+          this.statsContainer = null;
+          return;
+        }
 
         const puuid = targetProfile.getAttribute("puuid");
         if (!puuid || puuid === this.currentSummonerId) return;
 
         this.processedProfiles.clear();
         this.currentSummonerId = puuid;
+        this._statsRequestId++;
         this.processedProfiles.add(puuid);
         debouncedUpdate(puuid);
         this.createStatsContainer();
@@ -455,13 +402,17 @@ let data = [
     }
 
     async updateStats(puuid) {
+      if (this.isCleanedUp) return;
+      const requestId = ++this._statsRequestId;
+      const current = () => !this.isCleanedUp && requestId === this._statsRequestId &&
+        (!this.currentSummonerId || this.currentSummonerId === puuid);
       try {
         this.displayLoading();
         const stats = await this.fetchStats(puuid);
-        this.displayStats(stats);
+        if (current()) this.displayStats(stats);
       } catch (error) {
         console.error("[ProfileWinLose] Error updating stats:", error);
-        this.displayError();
+        if (current()) this.displayError();
       }
     }
 
@@ -469,6 +420,7 @@ let data = [
       if (!this.statsContainer) {
         this.createStatsContainer();
       }
+      if (!this.statsContainer) return;
       const content = document.createElement("div");
       content.className = "profile-win-loss-stats";
       content.innerHTML = `
@@ -478,7 +430,8 @@ let data = [
     }
 
     async fetchStats(puuid) {
-      const cacheKey = `stats_${puuid}_${CONFIG.selectedQueue}_${CONFIG.seasonFilter}`;
+      const { selectedQueue, gamesCount } = CONFIG;
+      const cacheKey = `stats_${puuid}_${selectedQueue}_${gamesCount}`;
       const cachedData = cache.get(cacheKey);
 
       if (
@@ -489,7 +442,7 @@ let data = [
       }
 
       const fetchData = async () => {
-        const endpoint = `/lol-match-history/v1/products/lol/${puuid}/matches?begIndex=0&endIndex=${CONFIG.gamesCount - 1
+        const endpoint = `/lol-match-history/v1/products/lol/${puuid}/matches?begIndex=0&endIndex=${gamesCount - 1
           }`;
         const response = await fetch(endpoint);
         if (!response.ok)
@@ -502,31 +455,27 @@ let data = [
         return { wins: 0, losses: 0, winRate: 0, kda: 0 };
       }
 
-      // Filter games by season if needed
-      let filteredGames = data.games.games;
-      if (CONFIG.seasonFilter === "on") {
-        filteredGames = filteredGames.filter(
-          (game) => game.gameCreation >= CONFIG.seasonStartDate
-        );
-      }
-
       // Filter by queue type
-      filteredGames =
-        CONFIG.selectedQueue === "all"
-          ? filteredGames
-          : filteredGames.filter(
-            (game) => game.queueId === QUEUE_TYPES[CONFIG.selectedQueue].id
+      const filteredGames =
+        selectedQueue === "all"
+          ? data.games.games
+          : data.games.games.filter(
+            (game) => game.queueId === QUEUE_TYPES[selectedQueue].id
           );
 
       // Limit to the user-specified number of games after filtering
-      const limitedGames = filteredGames.slice(0, CONFIG.gamesCount);
+      const limitedGames = filteredGames.slice(0, gamesCount);
 
       const stats = limitedGames.reduce(
         (acc, game) => {
-          const playerTeamId = game.participants[0].teamId;
-          const teamWin =
-            game.teams[playerTeamId === 100 ? 0 : 1].win === "Win";
-          const player = game.participants[0];
+          const identity = game.participantIdentities?.find((entry) => entry.player?.puuid === puuid);
+          const player = identity ? game.participants?.find((entry) => entry.participantId === identity.participantId) :
+            (game.participants?.length === 1 ? game.participants[0] : null);
+          if (!player?.stats) return acc;
+          const team = game.teams?.find((entry) => entry.teamId === player.teamId) ||
+            game.teams?.[player.teamId === 100 ? 0 : 1];
+          const teamWin = typeof player.stats.win === "boolean" ? player.stats.win : team?.win === "Win";
+          if (typeof player.stats.win !== "boolean" && !team) return acc;
 
           // Calculate KDA
           const kills = player.stats.kills || 0;
@@ -561,6 +510,7 @@ let data = [
         kda: kda,
       };
 
+      if (cache.size >= 100) cache.delete(cache.keys().next().value);
       cache.set(cacheKey, { data: result, timestamp: Date.now() });
       return result;
     }
@@ -569,6 +519,7 @@ let data = [
       if (!this.statsContainer) {
         this.createStatsContainer();
       }
+      if (!this.statsContainer) return;
 
       const content = document.createElement("div");
       content.className = "profile-win-loss-stats";
@@ -592,6 +543,7 @@ let data = [
       if (!this.statsContainer) {
         this.createStatsContainer();
       }
+      if (!this.statsContainer) return;
       this.statsContainer.innerHTML = `
                 <div class="profile-win-loss-stats error">
                     <span>Stats unavailable</span>
@@ -668,6 +620,7 @@ let data = [
         !document.contains(this.statsContainer)
       ) {
         this.currentSummonerId = puuid;
+        this._statsRequestId++;
         this.createStatsContainer();
         this.updateStats(puuid);
       }
@@ -754,7 +707,6 @@ let data = [
 
   // Initialize when window loads
   window.addEventListener("load", () => {
-    settingsUtils(window, data);
     new ProfileWinLoseStats();
   });
 })();

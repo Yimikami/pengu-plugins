@@ -3,7 +3,7 @@
  * @author Yimikami
  * @description Instantly creates solo/duo ranked lobby when pressing play button
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.1
+ * @version 0.0.2
  */
 
 (() => {
@@ -22,6 +22,8 @@
     constructor() {
       log("Initializing InstantRankedLobby plugin");
       this.observer = null;
+      this.handlers = new Map();
+      this.disposed = false;
       this.init();
     }
 
@@ -43,6 +45,9 @@
     }
 
     cleanup() {
+      this.disposed = true;
+      for (const [button, handler] of this.handlers) button.removeEventListener("click", handler, true);
+      this.handlers.clear();
       log("Cleaning up plugin resources");
       if (this.observer) {
         this.observer.disconnect();
@@ -51,6 +56,8 @@
     }
 
     async createRankedLobby() {
+      if (this.creatingLobby || this.disposed) return;
+      this.creatingLobby = true;
       try {
         log(`Creating ranked lobby with queue ID: ${CONFIG.queueId}`);
         const response = await fetch("/lol-lobby/v2/lobby", {
@@ -67,34 +74,44 @@
         log("Successfully created ranked lobby");
       } catch (error) {
         console.error("Error creating ranked lobby:", error);
-      }
+      } finally { this.creatingLobby = false; }
     }
 
     handlePlayButton(playButton) {
       log("Setting up play button click handler");
-      playButton.onclick = async (e) => {
+      if (this.handlers.has(playButton)) return;
+      const handler = async (e) => {
+        if (this.disposed || window.soloQMachine?.ownsPlayButton()) return;
         log("Play button clicked, creating ranked lobby");
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
         await this.createRankedLobby();
       };
+      this.handlers.set(playButton, handler);
+      playButton.addEventListener("click", handler, true);
     }
 
     observeDOM() {
       log("Starting DOM observation");
+      const scan = (root) => {
+        if (root.matches?.(".play-button-content")) this.handlePlayButton(root);
+        root.querySelectorAll?.(".play-button-content").forEach((button) => this.handlePlayButton(button));
+      };
       const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === 1) {
-              const playButton = node.querySelector(".play-button-content");
-              if (playButton && !playButton.dataset.instantRankedAdded) {
-                log("Found play button, adding click handler");
-                playButton.dataset.instantRankedAdded = "true";
-                this.handlePlayButton(playButton);
-              }
+              scan(node);
             }
           });
         });
+        for (const [button, handler] of this.handlers) {
+          if (!button.isConnected) {
+            button.removeEventListener("click", handler, true);
+            this.handlers.delete(button);
+          }
+        }
       });
 
       observer.observe(document.body, {
@@ -103,6 +120,7 @@
       });
 
       this.observer = observer;
+      scan(document.body);
     }
   }
 

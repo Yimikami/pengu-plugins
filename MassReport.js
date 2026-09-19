@@ -3,10 +3,10 @@
  * @author Yimikami
  * @description Allows mass reporting from match history
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.3
+ * @version 0.0.5
  */
 
-import { settingsUtils } from "https://unpkg.com/blank-settings-utils@latest/Settings-Utils.js";
+import { settingsUtils } from "https://unpkg.com/blank-settings-utils@1.0.0/Settings-Utils.js";
 
 let data = [
   {
@@ -26,6 +26,8 @@ let data = [
     ],
   },
 ];
+
+export function init() { settingsUtils(window, data); }
 
 (() => {
   const DEFAULT_CONFIG = {
@@ -89,6 +91,9 @@ let data = [
 
   // Utility functions
   const utils = {
+    escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+    },
     debugLog(message, data = null) {
       if (CONFIG.debug) {
         if (data) {
@@ -110,23 +115,26 @@ let data = [
     },
 
     // Fetch wrapper with retry logic
-    async fetchWithRetry(url, options = {}, retries = CONFIG.retryAttempts) {
+  async fetchWithRetry(url, options = {}, retries = CONFIG.retryAttempts) {
+    // Retry reads only: a lost write response does not mean the write failed.
+    const attempts = (options.method || "GET") === "GET" ? retries + 1 : 1;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      let retryable = true;
       try {
-        const response = await fetch(url, options);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response;
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        if (response.ok) return response;
+        retryable = response.status === 429 || response.status >= 500;
+        throw new Error(`HTTP error! status: ${response.status}`);
       } catch (error) {
-        if (retries > 0) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, CONFIG.retryDelay)
-          );
-          return this.fetchWithRetry(url, options, retries - 1);
-        }
-        throw error;
+        if (!retryable || attempt === attempts - 1) throw error;
+      } finally {
+        clearTimeout(timeout);
       }
-    },
+      await new Promise((resolve) => setTimeout(resolve, CONFIG.retryDelay * (attempt + 1)));
+    }
+  },
 
     // Delay helper
     delay(ms) {
@@ -173,8 +181,12 @@ let data = [
 
   class MassReport {
     constructor() {
-      this.init();
       this.styleElement = null;
+      this.reporting = false;
+      this.reported = new Set();
+      this.disposed = false;
+      this._matchIdGeneration = 0;
+      this.init();
     }
 
     async init() {
@@ -182,6 +194,7 @@ let data = [
       this.observeMatchHistory();
       this.injectStyles();
       this.initializeSettings();
+      window.addEventListener("unload", () => this.cleanup());
       utils.debugLog("Plugin initialized");
     }
 
@@ -190,7 +203,8 @@ let data = [
         const settingsContainer = document.querySelector(
           ".mass-report-settings"
         );
-        if (!settingsContainer) return;
+        if (!settingsContainer || settingsContainer.dataset.penguSettingsReady) return;
+        settingsContainer.dataset.penguSettingsReady = "true";
 
         settingsContainer.innerHTML = `
           <div class="lol-settings-general-row">   
@@ -199,7 +213,7 @@ let data = [
                 <p class="lol-settings-window-size-text">Whitelisted Players</p>
                 <div style="display: flex; gap: 10px;">
                   <lol-uikit-flat-input style="flex-grow: 1;">
-                    <input type="text" placeholder="Enter summoner name" id="whitelist-input"
+                    <input type="text" placeholder="Riot ID (name#tag) or puuid:..." id="whitelist-input"
                            style="width: 100%;">
                   </lol-uikit-flat-input>
                   <lol-uikit-flat-button id="add-whitelist-btn">Add</lol-uikit-flat-button>
@@ -211,8 +225,8 @@ let data = [
               .map(
                 (name) => `
                       <div class="whitelist-item">
-                        <span>${name}</span>
-                        <lol-uikit-flat-button class="remove-whitelist" data-name="${name}">Remove</lol-uikit-flat-button>
+                        <span>${utils.escapeHtml(name)}</span>
+                        <lol-uikit-flat-button class="remove-whitelist" data-name="${utils.escapeHtml(name)}">Remove</lol-uikit-flat-button>
                       </div>
                     `
               )
@@ -230,10 +244,10 @@ let data = [
       };
 
       // Observe for settings container
-      const observer = new MutationObserver((mutations) => {
+      const observer = this.settingsObserver = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           for (const node of mutation.addedNodes) {
-            if (node.classList?.contains("mass-report-settings")) {
+            if (node.nodeType === 1 && (node.matches(".mass-report-settings") || node.querySelector(".mass-report-settings"))) {
               addSettings();
               return;
             }
@@ -245,6 +259,7 @@ let data = [
         childList: true,
         subtree: true,
       });
+      addSettings();
     }
 
     setupSettingsEventListeners(settingsContainer) {
@@ -298,8 +313,8 @@ let data = [
             .map(
               (name) => `
                 <div class="whitelist-item">
-                  <span>${name}</span>
-                  <lol-uikit-flat-button class="remove-whitelist" data-name="${name}">Remove</lol-uikit-flat-button>
+                  <span>${utils.escapeHtml(name)}</span>
+                  <lol-uikit-flat-button class="remove-whitelist" data-name="${utils.escapeHtml(name)}">Remove</lol-uikit-flat-button>
                 </div>
               `
             )
@@ -317,8 +332,8 @@ let data = [
           .map(
             (name) => `
               <div class="whitelist-item">
-                <span>${name}</span>
-                <lol-uikit-flat-button class="remove-whitelist" data-name="${name}">Remove</lol-uikit-flat-button>
+                <span>${utils.escapeHtml(name)}</span>
+                <lol-uikit-flat-button class="remove-whitelist" data-name="${utils.escapeHtml(name)}">Remove</lol-uikit-flat-button>
               </div>
             `
           )
@@ -418,6 +433,26 @@ let data = [
       return option;
     }
 
+    cleanup() {
+      this.disposed = true;
+      this._matchIdGeneration++;
+      this.settingsObserver?.disconnect();
+      this.historyObserver?.disconnect();
+      this.styleElement?.remove();
+      document.getElementById("mass-report-container")?.remove();
+    }
+
+    isWhitelisted(player) {
+      const name = player.gameName || player.summonerName || "";
+      const tag = player.tagLine || player.gameTag || "";
+      return [...CONFIG.whitelistedPlayers].some((value) => {
+        const key = value.toLowerCase();
+        return key === `puuid:${player.puuid}`.toLowerCase() ||
+          (tag && key === `${name}#${tag}`.toLowerCase()) ||
+          (!value.includes("#") && !value.startsWith("puuid:") && key === name.toLowerCase());
+      });
+    }
+
     createDropdown() {
       const dropdown = document.createElement("lol-uikit-framed-dropdown");
       dropdown.style = "height: 32px;";
@@ -460,11 +495,18 @@ let data = [
     }
 
     observeMatchHistory() {
-      const observer = new MutationObserver(() => {
+      const check = () => {
+        if (this.disposed) return;
         const matchDetailsRoot = document.querySelector(".match-details-root");
+        if (matchDetailsRoot !== this._matchDetailsRoot) {
+          this._matchDetailsRoot = matchDetailsRoot;
+          this._matchIdGeneration++;
+          this._matchIdResolved = false;
+          this._matchIdPending = false;
+        }
         if (
           matchDetailsRoot &&
-          !document.querySelector("#mass-report-container")
+          !matchDetailsRoot.querySelector("#mass-report-container")
         ) {
           const navBar = matchDetailsRoot.querySelector(
             ".rcp-fe-lol-match-details-overlay-sub-nav"
@@ -474,12 +516,53 @@ let data = [
             this.injectElements(navBar);
           }
         }
-      });
+        if (matchDetailsRoot && !this._matchIdResolved && !this._matchIdPending) {
+          void this.fillOpenMatchId(matchDetailsRoot);
+        }
+      };
+      const observer = this.historyObserver = new MutationObserver(check);
+      observer.observe(document.body, { childList: true, subtree: true });
+      check();
+    }
 
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-      });
+    async getOpenMatchId(root) {
+      // The current client stores the opened game's ID on this Ember view,
+      // independently of the latest played game or the profile being viewed.
+      const ember = await window.__RCP_EMBER_API?.getEmber();
+      if (!root?.isConnected || !ember) return null;
+      for (const app of ember.Application?.NAMESPACES || []) {
+        if (app.isDestroyed || app.toString() !== "rcp-fe-lol-match-details-app") continue;
+        const view = app.__container__?.lookup("-view-registry:main")?.[root.id];
+        const id = String(view?.get?.("baseGameId") ?? "");
+        if (/^[1-9]\d*$/.test(id)) return id;
+      }
+      return null;
+    }
+
+    async fillOpenMatchId(root) {
+      const input = root.querySelector("#game-id-input");
+      if (!input) return;
+      const generation = this._matchIdGeneration;
+      this._matchIdPending = true;
+      try {
+        const gameId = await this.getOpenMatchId(root);
+        if (this.disposed || generation !== this._matchIdGeneration || !root.isConnected) return;
+        if (gameId) {
+          this._matchIdResolved = true;
+          if (!input.dataset.manualEntry) {
+            input.value = gameId;
+            input.readOnly = true;
+            input.title = "Game ID from the opened match";
+          }
+        }
+      } catch (error) {
+        utils.debugLog("Could not read the opened match ID", error);
+      } finally {
+        if (generation === this._matchIdGeneration && !this.disposed) {
+          this._matchIdPending = false;
+          input.placeholder = "Enter Game ID";
+        }
+      }
     }
 
     injectElements(navBar) {
@@ -494,8 +577,9 @@ let data = [
       const input = document.createElement("input");
       input.type = "text";
       input.id = "game-id-input";
-      input.placeholder = "Enter Game ID";
+      input.placeholder = "Detecting Game ID...";
       input.className = "mass-report-input";
+      input.addEventListener("input", () => { input.dataset.manualEntry = "true"; });
 
       const targetSelect = this.createTargetSelect();
 
@@ -522,13 +606,17 @@ let data = [
     }
 
     async handleReport(teamType = "all") {
-      const gameId = document.querySelector("#game-id-input").value;
-      if (!gameId) {
+      if (this.reporting || this.disposed) return;
+      const gameId = document.querySelector("#game-id-input")?.value.trim();
+      if (!/^\d+$/.test(gameId || "") || !["all", "ally", "enemy"].includes(teamType)) {
         utils.debugLog("No game ID entered");
         utils.showToast("error", "Please enter a Game ID");
         return;
       }
 
+      this.reporting = true;
+      const button = document.querySelector("#mass-report-btn");
+      button?.setAttribute("disabled", "");
       utils.debugLog(
         `Starting report process for game: ${gameId}, team: ${teamType}`
       );
@@ -540,6 +628,13 @@ let data = [
           CONFIG.api.currentSummoner
         );
         const currentSummoner = await currentSummonerResponse.json();
+        const reportStorageKey = `mass-report-confirmed:${currentSummoner.puuid || currentSummoner.summonerId}`;
+        if (this._reportAccount !== reportStorageKey) {
+          this.reported.clear();
+          this._reportAccount = reportStorageKey;
+        }
+        const storedReports = DataStore.get(reportStorageKey);
+        if (Array.isArray(storedReports)) storedReports.forEach((key) => this.reported.add(key));
         utils.debugLog("Current summoner:", currentSummoner);
 
         // Get game data
@@ -594,6 +689,7 @@ let data = [
         );
 
         for (const player of players) {
+          if (this.disposed) break;
           const playerName =
             player.player.gameName || player.player.summonerName;
           const playerParticipant = participantMap.get(player.participantId);
@@ -619,7 +715,7 @@ let data = [
           }
 
           // Skip if player is whitelisted
-          if (CONFIG.whitelistedPlayers.has(playerName)) {
+          if (this.isWhitelisted(player.player)) {
             utils.debugLog(`Skipping whitelisted player (${playerName})`);
             skippedCount++;
             continue;
@@ -648,6 +744,8 @@ let data = [
             teamType,
           });
 
+          const reportKey = `${gameId}:${player.player.puuid || player.player.summonerId}`;
+          if (this.reported.has(reportKey)) { skippedCount++; continue; }
           const success = await sendReport(
             player.player.summonerId,
             player.player.puuid,
@@ -656,6 +754,9 @@ let data = [
           );
 
           if (success) {
+            this.reported.add(reportKey);
+            if (this.reported.size > 2000) this.reported.delete(this.reported.values().next().value);
+            DataStore.set(reportStorageKey, Array.from(this.reported));
             reportCount++;
           } else {
             failCount++;
@@ -675,13 +776,15 @@ let data = [
         utils.debugLog("Error in report process:", error);
         console.error("Error:", error);
         utils.showToast("error", "Failed to process reports");
+      } finally {
+        this.reporting = false;
+        button?.removeAttribute("disabled");
       }
     }
   }
 
   // Initialize when window loads
   window.addEventListener("load", () => {
-    settingsUtils(window, data);
     new MassReport();
   });
 })();
