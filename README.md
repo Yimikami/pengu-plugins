@@ -15,7 +15,7 @@ Download each ready-to-install plugin from its own release.
 | [SoloQ Machine](#soloq-machine) | [SoloQMachine.js](https://github.com/Yimikami/pengu-plugins/releases/download/soloq-machine/v0.0.2/SoloQMachine.js) | Queue, accept, honor and play-again automation |
 | [Rune Plugin](#rune-plugin) | [RunePlugin.js](https://github.com/Yimikami/pengu-plugins/releases/download/rune-plugin/v0.0.6/RunePlugin.js) | Automatic runes and item sets |
 | [Icon Swapper](#icon-swapper) | [IconSwapper.js](https://github.com/Yimikami/pengu-plugins/releases/download/icon-swapper/v0.1.1/IconSwapper.js) | Local summoner icon customization |
-| [Profile Win/Loss](#profile-winloss) | [ProfileWinLose.js](https://github.com/Yimikami/pengu-plugins/releases/download/profile-win-loss/v0.0.4/ProfileWinLose.js) | Profile win rate, match counts and KDA |
+| [Profile Win/Loss](#profile-winloss) | [ProfileWinLose.js](https://github.com/Yimikami/pengu-plugins/releases/download/profile-win-loss/v0.0.5/ProfileWinLose.js) | Profile win rate, match counts and KDA |
 | [Champion Dismisser](#champion-dismisser) | [ChampionDismisser.js](https://github.com/Yimikami/pengu-plugins/releases/download/champion-dismisser/v0.0.3/ChampionDismisser.js) | Blacklist owned champions; excludes Classic variants |
 | [Mass Report](#mass-report) | [MassReport.js](https://github.com/Yimikami/pengu-plugins/releases/download/mass-report/v0.0.5/MassReport.js) | Match-history reporting with whitelist controls |
 | [Force Badge](#force-badge) | [ForceBadge.js](https://github.com/Yimikami/pengu-plugins/releases/download/force-badge/v0.0.2/ForceBadge.js) | Visual Game Pass badges for champions and skins |
@@ -82,9 +82,11 @@ This is a local visual change; it does not unlock icons or change what other pla
 
 ### Profile Win/Loss
 
-Displays win rate, wins/losses and optional KDA on summoner profiles.
+Displays win rate, wins/losses and optional KDA on summoner profiles using the League client's match history.
 
 Open **Client Settings → Profile Win/Loss** to choose the number of games to analyze and the queue filter. There is no fixed season or date cutoff; results use the available match history within your selected limits.
+
+Queue filters: All Queues, Ranked Solo/Duo, Ranked Flex, Ranked 5s, Normal Draft, Classic Rift, ARAM, ARAM: Mayhem, Arena and Swiftplay. Arena includes its different matchmaking variants, including Bravery Arena and Arena 3x6.
 
 ### Champion Dismisser
 

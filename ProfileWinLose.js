@@ -3,7 +3,7 @@
  * @author Yimikami
  * @description Shows summoner's win/loss statistics and win rate on their profile
  * @link https://github.com/Yimikami/pengu-plugins/
- * @version 0.0.4
+ * @version 0.0.5
  */
 
 import { settingsUtils } from "https://unpkg.com/blank-settings-utils@1.0.0/Settings-Utils.js";
@@ -53,8 +53,12 @@ export function init() { settingsUtils(window, data); }
     all: { id: "all", name: "All Queues" },
     ranked_solo: { id: 420, name: "Ranked (Solo/Duo)" },
     ranked_flex: { id: 440, name: "Ranked (Flex)" },
+    ranked_5s: { id: 710, name: "Ranked 5s" },
     normal_draft: { id: 400, name: "Normal (Draft Pick)" },
+    classic_rift: { id: 4310, name: "Classic Rift" },
     aram: { id: 450, name: "ARAM" },
+    aram_mayhem: { id: 2400, name: "ARAM: Mayhem" },
+    arena: { ids: [1700, 1710, 1740, 1750], name: "Arena" },
     swiftplay: { id: 480, name: "Swiftplay" },
   };
 
@@ -460,7 +464,7 @@ export function init() { settingsUtils(window, data); }
         selectedQueue === "all"
           ? data.games.games
           : data.games.games.filter(
-            (game) => game.queueId === QUEUE_TYPES[selectedQueue].id
+            (game) => (QUEUE_TYPES[selectedQueue].ids || [QUEUE_TYPES[selectedQueue].id]).includes(game.queueId)
           );
 
       // Limit to the user-specified number of games after filtering
